@@ -57,6 +57,118 @@ const LoginPage = ({ onLogin }) => {
       setLoading(false);
     }
   };
+    return (
+    <div style={{ display:"flex", height:"100vh", background:"#080810", fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        * { box-sizing:border-box; margin:0; padding:0; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        input::placeholder { color:#3a3a6a; }
+        .login-input:focus { border-color:#7c5af0 !important; outline:none; }
+      `}</style>
+
+      {/* Left panel */}
+      <div style={{ flex:1, background:"linear-gradient(135deg,#080810,#0e0e1a,#0d0820)", display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"40px 48px", position:"relative", overflow:"hidden" }}>
+        {/* Glow */}
+        <div style={{ position:"absolute", top:"40%", left:"40%", transform:"translate(-50%,-50%)", width:500, height:500, background:"radial-gradient(circle,rgba(124,90,240,0.1),transparent 70%)", pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", bottom:"20%", right:"10%", width:300, height:300, background:"radial-gradient(circle,rgba(62,207,178,0.06),transparent 70%)", pointerEvents:"none" }}/>
+
+        {/* Back + Logo */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <a href="/landing.html" style={{ display:"flex", alignItems:"center", gap:10, textDecoration:"none" }}>
+            <div style={{ width:36, height:36, borderRadius:9, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>⚡</div>
+            <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:19, color:"#e8e8f5" }}>Boost<span style={{ color:"#7c5af0" }}>Chat</span></span>
+          </a>
+          <a href="/landing.html" style={{ display:"flex", alignItems:"center", gap:6, color:"#6060a0", fontSize:13, textDecoration:"none", border:"1px solid #1e1e35", borderRadius:8, padding:"6px 14px", transition:"color 0.2s" }}
+            onMouseOver={e=>e.currentTarget.style.color="#e8e8f5"} onMouseOut={e=>e.currentTarget.style.color="#6060a0"}>
+            ← Back to site
+          </a>
+        </div>
+
+        {/* Center content */}
+        <div style={{ position:"relative", zIndex:1 }}>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(124,90,240,0.1)", border:"1px solid rgba(124,90,240,0.25)", borderRadius:100, padding:"5px 14px", fontSize:11, fontWeight:700, color:"#a78bfa", letterSpacing:0.5, marginBottom:28 }}>
+            <span style={{ width:6, height:6, borderRadius:"50%", background:"#3ecfb2", boxShadow:"0 0 8px #3ecfb2", animation:"pulse 2s infinite", display:"inline-block" }}></span>
+            PRIVATE · INVITE ONLY
+          </div>
+          <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:"clamp(36px,4vw,58px)", fontWeight:800, letterSpacing:"-1.5px", lineHeight:1.1, marginBottom:16, color:"#e8e8f5" }}>
+            Your business.<br/>
+            <span style={{ background:"linear-gradient(135deg,#7c5af0,#3ecfb2)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Fully wired.</span>
+          </h1>
+          <p style={{ color:"#6060a0", fontSize:15, lineHeight:1.7, maxWidth:380, marginBottom:32 }}>
+            Sign in to access your BoostChat dashboard and manage your operations in real time.
+          </p>
+          <a href="https://t.me/yeyeyewepaid" target="_blank" style={{ display:"inline-flex", alignItems:"center", gap:8, background:"#0088cc", color:"#fff", borderRadius:10, padding:"12px 24px", fontSize:14, fontWeight:700, textDecoration:"none", boxShadow:"0 8px 24px rgba(0,136,204,0.3)" }}>
+            ✈ Contact on Telegram
+          </a>
+        </div>
+
+        {/* Bottom stat cards */}
+        <div style={{ display:"flex", gap:16 }}>
+          {[["⚡","Real-time","Operations"],["🔒","100%","Private"],["24/7","Always","Online"]].map(([icon,val,label],i) => (
+            <div key={i} style={{ flex:1, background:"rgba(255,255,255,0.03)", border:"1px solid #1e1e35", borderRadius:12, padding:"14px 16px" }}>
+              <div style={{ fontSize:18, marginBottom:6 }}>{icon}</div>
+              <div style={{ fontFamily:"'Syne',sans-serif", fontSize:18, fontWeight:800, color:"#e8e8f5" }}>{val}</div>
+              <div style={{ fontSize:11, color:"#5050a0", marginTop:2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right panel - login form */}
+      <div style={{ width:460, background:"#0e0e1a", display:"flex", flexDirection:"column", justifyContent:"center", padding:"48px", borderLeft:"1px solid #1e1e35" }}>
+        <div style={{ marginBottom:36 }}>
+          <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:28, fontWeight:800, marginBottom:6, color:"#e8e8f5", letterSpacing:"-0.5px" }}>Welcome back</h2>
+          <p style={{ color:"#5050a0", fontSize:14 }}>Sign in to your BoostChat account.</p>
+        </div>
+
+        <form onSubmit={handleLogin}>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#6060a0", marginBottom:6, letterSpacing:0.3 }}>USERNAME OR EMAIL</label>
+            <input
+              className="login-input"
+              value={form.username}
+              onChange={e => setForm({...form, username:e.target.value})}
+              placeholder="Enter your username..."
+              style={{ width:"100%", background:"#12121f", border:`1px solid ${error?"#e05050":"#1e1e35"}`, borderRadius:10, padding:"12px 16px", color:"#e8e8f5", fontSize:14, fontFamily:"inherit" }}
+              autoComplete="username"
+            />
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#6060a0", marginBottom:6, letterSpacing:0.3 }}>PASSWORD</label>
+            <input
+              className="login-input"
+              type="password"
+              value={form.password}
+              onChange={e => setForm({...form, password:e.target.value})}
+              placeholder="Enter your password..."
+              style={{ width:"100%", background:"#12121f", border:"1px solid #1e1e35", borderRadius:10, padding:"12px 16px", color:"#e8e8f5", fontSize:14, fontFamily:"inherit" }}
+              autoComplete="current-password"
+            />
+          </div>
+
+          {error && (
+            <div style={{ background:"rgba(224,80,80,0.1)", border:"1px solid rgba(224,80,80,0.25)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"#f87171", marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          <button type="submit" disabled={loading}
+            style={{ width:"100%", background: loading?"#5a4ab0":"#7c5af0", border:"none", borderRadius:10, padding:"13px", color:"#fff", fontSize:15, fontWeight:700, cursor: loading?"not-allowed":"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(124,90,240,0.3)", transition:"all 0.2s" }}>
+            {loading ? <div style={{ width:18, height:18, border:"2px solid #ffffff44", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/> : null}
+            {loading ? "Signing in..." : "Sign in →"}
+          </button>
+        </form>
+
+        <div style={{ textAlign:"center", marginTop:24, fontSize:12, color:"#3a3a6a", lineHeight:1.6 }}>
+          Don't have access?{" "}
+          <a href="https://t.me/yeyeyewepaid" target="_blank" style={{ color:"#7c5af0", textDecoration:"none", fontWeight:600 }}>Contact us on Telegram</a>
+        </div>
+      </div>
+    </div>
+  );
+  
 
   return (
     <div style={{ display:"flex", height:"100vh", background:"#0d0d12", fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
@@ -72,11 +184,11 @@ const LoginPage = ({ onLogin }) => {
         <div style={{ position:"absolute", top:"30%", left:"50%", transform:"translate(-50%,-50%)", width:400, height:400, background:"radial-gradient(circle,#6c4fd833,transparent 70%)", pointerEvents:"none" }}/>
         <div style={{ position:"absolute", top:40, left:48, display:"flex", alignItems:"center", gap:12 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>💬</div>
-          <span style={{ fontWeight:800, fontSize:18, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>One Chat</span>
+          <span style={{ fontWeight:800, fontSize:18, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Boost Chat</span>
         </div>
-        <h1 style={{ fontSize:32, fontWeight:900, color:"#fff", marginBottom:12, lineHeight:1.2 }}>One Chat</h1>
+        <h1 style={{ fontSize:32, fontWeight:900, color:"#fff", marginBottom:12, lineHeight:1.2 }}>Boost Chat</h1>
         <p style={{ color:"#8080a0", fontSize:15, lineHeight:1.6, maxWidth:400 }}>
-          Interested in incorporating One Chat into your business operations? Reach out to the developer via Telegram for direct assistance and consultation.
+          Interested in incorporating Boost Chat into your business operations? Reach out to the developer via Telegram for direct assistance and consultation.
         </p>
         <div style={{ marginTop:24 }}>
           <button style={{ ...S.btn("#0088cc"), borderRadius:20, fontSize:13 }}>✈ fearganni</button>
@@ -87,7 +199,7 @@ const LoginPage = ({ onLogin }) => {
       <div style={{ width:480, background:"#13131a", display:"flex", flexDirection:"column", justifyContent:"center", padding:"48px", borderLeft:"1px solid #1e1e2e" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:32 }}>
           <div>
-            <h2 style={{ fontSize:24, fontWeight:800, marginBottom:4 }}>One Chat</h2>
+            <h2 style={{ fontSize:24, fontWeight:800, marginBottom:4 }}>Boost Chat</h2>
             <p style={{ color:"#6060a0", fontSize:13 }}>Streamlining Support, Amplifying Success.</p>
           </div>
           <div style={{ width:44, height:44, borderRadius:12, background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>💬</div>
@@ -167,7 +279,7 @@ const TopBar = ({ page, setPage, user, onLogout, showNotifs, setShowNotifs }) =>
   <div style={S.topbar}>
     <div style={{ display:"flex", alignItems:"center", gap:10 }}>
       <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>💬</div>
-      <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>one chat</span>
+      <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Boost chat</span>
     </div>
     <div style={{ display:"flex", gap:6 }}>
       {["Customers","Tickets","Analytics","Reports","Logs"].map(p => {
@@ -572,7 +684,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
         <div>
           <h1 style={{ margin:"0 0 4px", fontSize:22, fontWeight:800 }}>{node.name}</h1>
-          <p style={{ margin:0, color:"#6060a0", fontSize:13 }}>Manage, customize and configure your One Chat node.</p>
+          <p style={{ margin:0, color:"#6060a0", fontSize:13 }}>Manage, customize and configure your Boost Chat node.</p>
         </div>
       </div>
 
@@ -1040,7 +1152,7 @@ const SettingsPage = ({ user }) => {
   return (
     <div>
       <div style={{ display:"flex", gap:6, marginBottom:4, color:"#6060a0", fontSize:13 }}>
-        <span style={{ color:"#a78bfa" }}>One Chat</span> / <span style={{ color:"#a78bfa" }}>Profile</span> / <span>Settings</span>
+        <span style={{ color:"#a78bfa" }}>Boost Chat</span> / <span style={{ color:"#a78bfa" }}>Profile</span> / <span>Settings</span>
       </div>
       <h1 style={{ margin:"0 0 4px", fontSize:24, fontWeight:800 }}>Settings</h1>
       <p style={{ margin:"0 0 24px", color:"#6060a0", fontSize:13 }}>Modify account information, and change critical settings for your account.</p>
