@@ -191,7 +191,7 @@ const LoginPage = ({ onLogin }) => {
           Interested in incorporating Boost Chat into your business operations? Reach out to the developer via Telegram for direct assistance and consultation.
         </p>
         <div style={{ marginTop:24 }}>
-          <button style={{ ...S.btn("#0088cc"), borderRadius:20, fontSize:13 }}>✈ fearganni</button>
+          <button style={{ ...S.btn("#0088cc"), borderRadius:20, fontSize:13 }}>✈ yeyeyewepaid</button>
         </div>
       </div>
 
