@@ -1,7 +1,3 @@
-// TelegramSettingsTab.jsx
-// Drop this component into your App.jsx NodeDetailPage
-// Replace the current Telegram tab section with this
-
 import { useState, useEffect } from "react";
 
 const TelegramSettingsTab = ({ node, api, S }) => {
@@ -9,20 +5,37 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // State for data from API
-  const [commands, setCommands] = useState([]);
+  // Main data
   const [services, setServices] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [commands, setCommands] = useState([]);
 
-  // State for new items being added
+  // Modals
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [editingQuestion, setEditingQuestion] = useState(null);
   const [newCmd, setNewCmd] = useState({ cmd: "", desc: "" });
-  const [newService, setNewService] = useState({ name: "", emoji: "" });
-  const [newQuestion, setNewQuestion] = useState({ 
-    service_id: "", 
-    question: "", 
-    type: "text", 
-    options: [] 
+
+  // Form state
+  const [serviceForm, setServiceForm] = useState({
+    name: "",
+    description: "",
+    open_message_content: "",
+    closed_message_content: "",
+    queue_full_message_content: "",
+    queue_break_message_content: "",
+    show_button_new_row: false,
+    webapp_mode: false,
+    attached_questions: []
   });
+
+  const [questionForm, setQuestionForm] = useState({
+    question_text: "",
+    question_type: "text",
+    options: []
+  });
+
   const [newOption, setNewOption] = useState("");
 
   // Load data on mount
@@ -52,16 +65,23 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       await api(`/nodes/${node.id}/settings`, {
         method: "PUT",
         body: {
-          commands: commands.map((c, i) => ({ cmd: c.command, desc: c.description })),
-          services: services.map((s, i) => ({ 
-            name: s.name, 
-            emoji: s.emoji, 
-            shortcode: s.shortcode || "" 
+          commands: commands.map(c => ({ cmd: c.command, desc: c.description })),
+          services: services.map(s => ({
+            id: s.id,
+            name: s.name,
+            description: s.description,
+            open_message_content: s.open_message_content,
+            closed_message_content: s.closed_message_content,
+            queue_full_message_content: s.queue_full_message_content,
+            queue_break_message_content: s.queue_break_message_content,
+            show_button_new_row: s.show_button_new_row,
+            webapp_mode: s.webapp_mode,
+            attached_questions: s.attached_questions || []
           })),
-          questions: questions.map((q, i) => ({
-            question: q.question,
-            type: q.question_type,
-            service_index: services.findIndex(s => s.id === q.service_id),
+          questions: questions.map(q => ({
+            id: q.id,
+            question_text: q.question,
+            question_type: q.question_type,
             options: q.options || []
           }))
         }
@@ -75,7 +95,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     }
   };
 
-  // Commands handlers
+  // Commands
   const addCommand = () => {
     if (!newCmd.cmd || !newCmd.desc) return;
     setCommands([...commands, { command: newCmd.cmd, description: newCmd.desc }]);
@@ -86,61 +106,131 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     setCommands(commands.filter((_, i) => i !== index));
   };
 
-  // Services handlers
-  const addService = () => {
-    if (!newService.name) return;
-    setServices([...services, { name: newService.name, emoji: newService.emoji || "⭐", shortcode: "" }]);
-    setNewService({ name: "", emoji: "" });
+  // Services
+  const openServiceModal = (service = null) => {
+    if (service) {
+      setEditingService(service.id);
+      setServiceForm({
+        name: service.name || "",
+        description: service.description || "",
+        open_message_content: service.open_message_content || "",
+        closed_message_content: service.closed_message_content || "",
+        queue_full_message_content: service.queue_full_message_content || "",
+        queue_break_message_content: service.queue_break_message_content || "",
+        show_button_new_row: service.show_button_new_row || false,
+        webapp_mode: service.webapp_mode || false,
+        attached_questions: service.attached_questions || []
+      });
+    } else {
+      setEditingService(null);
+      setServiceForm({
+        name: "",
+        description: "",
+        open_message_content: "",
+        closed_message_content: "",
+        queue_full_message_content: "",
+        queue_break_message_content: "",
+        show_button_new_row: false,
+        webapp_mode: false,
+        attached_questions: []
+      });
+    }
+    setShowServiceModal(true);
   };
 
-  const removeService = (index) => {
-    setServices(services.filter((_, i) => i !== index));
-    // Also remove questions for this service
-    setQuestions(questions.filter(q => q.service_id !== services[index].id));
+  const saveService = () => {
+    if (!serviceForm.name) {
+      alert("Service name required");
+      return;
+    }
+
+    if (editingService) {
+      const idx = services.findIndex(s => s.id === editingService);
+      const updated = [...services];
+      updated[idx] = { ...updated[idx], ...serviceForm };
+      setServices(updated);
+    } else {
+      setServices([...services, { id: Date.now(), ...serviceForm }]);
+    }
+    setShowServiceModal(false);
   };
 
-  const updateService = (index, field, value) => {
-    const updated = [...services];
-    updated[index] = { ...updated[index], [field]: value };
-    setServices(updated);
+  const deleteService = (id) => {
+    if (confirm("Delete this service?")) {
+      setServices(services.filter(s => s.id !== id));
+    }
   };
 
-  // Questions handlers
-  const addQuestion = () => {
-    if (!newQuestion.service_id || !newQuestion.question) return;
-    setQuestions([...questions, {
-      question: newQuestion.question,
-      question_type: newQuestion.type,
-      service_id: newQuestion.service_id,
-      options: newQuestion.options
-    }]);
-    setNewQuestion({ service_id: "", question: "", type: "text", options: [] });
-    setNewOption("");
+  const toggleQuestionAttachment = (questionId) => {
+    const attached = serviceForm.attached_questions || [];
+    if (attached.includes(questionId)) {
+      setServiceForm({ ...serviceForm, attached_questions: attached.filter(q => q !== questionId) });
+    } else {
+      setServiceForm({ ...serviceForm, attached_questions: [...attached, questionId] });
+    }
   };
 
-  const removeQuestion = (index) => {
-    setQuestions(questions.filter((_, i) => i !== index));
+  // Questions
+  const openQuestionModal = (question = null) => {
+    if (question) {
+      setEditingQuestion(question.id);
+      setQuestionForm({
+        question_text: question.question || "",
+        question_type: question.question_type || "text",
+        options: question.options || []
+      });
+    } else {
+      setEditingQuestion(null);
+      setQuestionForm({
+        question_text: "",
+        question_type: "text",
+        options: []
+      });
+    }
+    setShowQuestionModal(true);
   };
 
-  const updateQuestion = (index, field, value) => {
-    const updated = [...questions];
-    updated[index] = { ...updated[index], [field]: value };
-    setQuestions(updated);
+  const saveQuestion = () => {
+    if (!questionForm.question_text) {
+      alert("Question text required");
+      return;
+    }
+
+    if (editingQuestion) {
+      const idx = questions.findIndex(q => q.id === editingQuestion);
+      const updated = [...questions];
+      updated[idx] = { ...updated[idx], question: questionForm.question_text, question_type: questionForm.question_type, options: questionForm.options };
+      setQuestions(updated);
+    } else {
+      setQuestions([...questions, { id: Date.now(), question: questionForm.question_text, question_type: questionForm.question_type, options: questionForm.options }]);
+    }
+    setShowQuestionModal(false);
+  };
+
+  const deleteQuestion = (id) => {
+    if (confirm("Delete this question?")) {
+      setQuestions(questions.filter(q => q.id !== id));
+      // Remove from all services
+      setServices(services.map(s => ({
+        ...s,
+        attached_questions: (s.attached_questions || []).filter(qId => qId !== id)
+      })));
+    }
   };
 
   const addQuestionOption = () => {
-    if (!newOption || !newQuestion.service_id) return;
-    setNewQuestion({
-      ...newQuestion,
-      options: [...(newQuestion.options || []), { option_text: newOption }]
+    if (!newOption) return;
+    setQuestionForm({
+      ...questionForm,
+      options: [...(questionForm.options || []), { option_text: newOption }]
     });
     setNewOption("");
   };
 
-  const removeQuestionOption = (optIndex) => {
-    setNewQuestion({
-      ...newQuestion,
-      options: newQuestion.options.filter((_, i) => i !== optIndex)
+  const removeQuestionOption = (idx) => {
+    setQuestionForm({
+      ...questionForm,
+      options: questionForm.options.filter((_, i) => i !== idx)
     });
   };
 
@@ -151,28 +241,18 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   return (
     <div>
       {error && (
-        <div style={{ 
-          background: "#e05050", 
-          color: "#fff", 
-          padding: "12px 16px", 
-          borderRadius: 8, 
-          marginBottom: 16, 
-          fontSize: 13 
-        }}>
+        <div style={{ background: "#e05050", color: "#fff", padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
           ❌ {error}
         </div>
       )}
 
-      {/* Commands Section */}
+      {/* Commands */}
       <div style={{ ...S.card, marginBottom: 16 }}>
         <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#60a5fa" }}>📝</span>
           <span style={{ fontWeight: 700, fontSize: 13 }}>Commands</span>
         </div>
         <div style={{ padding: "20px" }}>
-          <p style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
-            Telegram bots need start commands. It's the gateway to your bot's world.
-          </p>
           {commands.map((c, i) => (
             <div key={i} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "10px 16px", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
@@ -190,200 +270,219 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         </div>
       </div>
 
-      {/* Services Section */}
+      {/* Services */}
       <div style={{ ...S.card, marginBottom: 16 }}>
         <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#60a5fa" }}>🎯</span>
           <span style={{ fontWeight: 700, fontSize: 13 }}>Services / Buttons</span>
         </div>
         <div style={{ padding: "20px" }}>
-          <p style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
-            Add the services your bot offers as clickable buttons for customers.
-          </p>
-          {services.map((s, i) => (
-            <div key={`service-${s.id || i}`} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input 
-                  type="text"
-                  style={{ ...S.input, width: 50, fontSize: 16, textAlign: "center" }} 
-                  value={s.emoji || "⭐"} 
-                  onChange={e => updateService(i, "emoji", e.target.value)}
-                  maxLength="2"
-                  placeholder="🍕"
-                />
-                <input 
-                  type="text"
-                  style={{ ...S.input, flex: 1 }} 
-                  value={s.name} 
-                  onChange={e => updateService(i, "name", e.target.value)}
-                  placeholder="Service name"
-                />
-                <button onClick={() => removeService(i)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}>Edit ✕</button>
+          {services.map(s => (
+            <div key={s.id} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#e2e2f0", fontWeight: 600 }}>{s.name}</div>
+                <div style={{ fontSize: 12, color: "#6060a0" }}>{s.description || "No description"}</div>
+                {(s.attached_questions || []).length > 0 && (
+                  <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
+                    {s.attached_questions.length} question(s) attached
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => openServiceModal(s)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>Edit</button>
+                <button onClick={() => deleteService(s.id)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", color: "#e05050" }}>✕</button>
               </div>
             </div>
           ))}
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <input 
-              style={{ ...S.input, width: 60, fontSize: 16, textAlign: "center" }} 
-              placeholder="🍕" 
-              value={newService.emoji} 
-              onChange={e => setNewService({ ...newService, emoji: e.target.value })}
-              maxLength="2"
-            />
-            <input 
-              style={{ ...S.input, flex: 1 }} 
-              placeholder="Service name (e.g., Food Delivery)" 
-              value={newService.name} 
-              onChange={e => setNewService({ ...newService, name: e.target.value })}
-            />
-            <button onClick={addService} style={S.btn()}>+ Add</button>
-          </div>
+          <button onClick={() => openServiceModal()} style={{ ...S.btn("#34d398"), fontSize: 12, marginTop: 12 }}>+ Add Service</button>
         </div>
       </div>
 
-      {/* Questions Section */}
+      {/* Questions */}
       <div style={{ ...S.card, marginBottom: 16 }}>
         <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#60a5fa" }}>❓</span>
           <span style={{ fontWeight: 700, fontSize: 13 }}>Questions</span>
         </div>
         <div style={{ padding: "20px" }}>
-          <p style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
-            Gather information from your customers with custom questions.
-          </p>
-
-          {/* Existing Questions */}
-          {questions.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 8, fontWeight: 600 }}>Existing Questions</div>
-              {questions.map((q, i) => {
-                const serviceName = services.find(s => s.id === q.service_id)?.name || "Unknown";
-                return (
-                  <div key={i} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 11, color: "#60a5fa", marginBottom: 4 }}>📌 {serviceName}</div>
-                        <div style={{ fontSize: 13, color: "#e2e2f0", marginBottom: 6, fontWeight: 600 }}>{q.question}</div>
-                        <div style={{ fontSize: 11, color: "#6060a0" }}>
-                          Type: <span style={{ color: "#a0a0c0" }}>{q.question_type}</span>
-                        </div>
-                        {q.options && q.options.length > 0 && (
-                          <div style={{ fontSize: 11, color: "#6060a0", marginTop: 4 }}>
-                            Options: {q.options.map(o => o.option_text || o).join(", ")}
-                          </div>
-                        )}
-                      </div>
-                      <button onClick={() => removeQuestion(i)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}>Edit ✕</button>
-                    </div>
+          {questions.map(q => (
+            <div key={q.id} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: "#e2e2f0", fontWeight: 600 }}>{q.question}</div>
+                <div style={{ fontSize: 11, color: "#6060a0", marginTop: 4 }}>Type: {q.question_type}</div>
+                {q.options && q.options.length > 0 && (
+                  <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
+                    Options: {q.options.map(o => o.option_text || o).join(", ")}
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Add New Question */}
-          <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "16px", marginTop: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#e2e2f0" }}>Add New Question</div>
-
-            {/* Service Selection */}
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 4 }}>Service</label>
-              <select 
-                value={newQuestion.service_id} 
-                onChange={e => setNewQuestion({ ...newQuestion, service_id: e.target.value })}
-                style={{ ...S.input, background: "#16161f" }}
-              >
-                <option value="">Select a service...</option>
-                {services.map(s => (
-                  <option key={s.id} value={s.id}>{s.emoji} {s.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Question Text */}
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 4 }}>Question</label>
-              <input 
-                style={S.input} 
-                placeholder="e.g., What is your delivery address?" 
-                value={newQuestion.question}
-                onChange={e => setNewQuestion({ ...newQuestion, question: e.target.value })}
-              />
-            </div>
-
-            {/* Question Type */}
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 4 }}>Response Type</label>
-              <select 
-                value={newQuestion.type} 
-                onChange={e => setNewQuestion({ ...newQuestion, type: e.target.value })}
-                style={{ ...S.input, background: "#16161f" }}
-              >
-                <option value="text">📝 Free Text</option>
-                <option value="number">🔢 Number Only</option>
-                <option value="photo">📷 Photo Upload</option>
-                <option value="inline_preset_buttons">🔘 Button Options</option>
-              </select>
-            </div>
-
-            {/* Button Options (if type is buttons) */}
-            {newQuestion.type === "inline_preset_buttons" && (
-              <div style={{ marginBottom: 12, background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12 }}>
-                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8 }}>Button Options</label>
-                {newQuestion.options && newQuestion.options.map((opt, idx) => (
-                  <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                    <input 
-                      disabled 
-                      value={opt.option_text || opt} 
-                      style={{ ...S.input, flex: 1, opacity: 0.7 }}
-                    />
-                    <button 
-                      onClick={() => removeQuestionOption(idx)} 
-                      style={{ ...S.btnOutline, fontSize: 11, padding: "6px 10px" }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input 
-                    style={S.input} 
-                    placeholder="e.g., Delivery" 
-                    value={newOption}
-                    onChange={e => setNewOption(e.target.value)}
-                  />
-                  <button onClick={addQuestionOption} style={{ ...S.btn(), fontSize: 12 }}>+ Add Option</button>
-                </div>
+                )}
               </div>
-            )}
-
-            <button 
-              onClick={addQuestion} 
-              style={{ ...S.btn(), fontSize: 12 }}
-              disabled={!newQuestion.service_id || !newQuestion.question}
-            >
-              + Add Question
-            </button>
-          </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => openQuestionModal(q)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>Edit</button>
+                <button onClick={() => deleteQuestion(q.id)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", color: "#e05050" }}>✕</button>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => openQuestionModal()} style={{ ...S.btn("#34d398"), fontSize: 12, marginTop: 12 }}>+ Add Question</button>
         </div>
       </div>
 
       {/* Save Button */}
       <div style={{ display: "flex", gap: 8 }}>
-        <button 
-          onClick={saveSettings} 
-          disabled={saving}
-          style={{ ...S.btn("#34d398"), fontSize: 13, padding: "10px 20px" }}
-        >
+        <button onClick={saveSettings} disabled={saving} style={{ ...S.btn("#34d398"), fontSize: 13, padding: "10px 20px" }}>
           {saving ? "💾 Saving..." : "✅ Save All Settings"}
         </button>
-        <button 
-          onClick={loadSettings} 
-          style={{ ...S.btnOutline, fontSize: 13, padding: "10px 20px" }}
-        >
+        <button onClick={loadSettings} style={{ ...S.btnOutline, fontSize: 13, padding: "10px 20px" }}>
           ↻ Reload
         </button>
       </div>
+
+      {/* Service Modal */}
+      {showServiceModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ ...S.card, width: "90%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: 0 }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
+                {editingService ? "Edit Service" : "Add New Service"}
+              </h3>
+              <button onClick={() => setShowServiceModal(false)} style={{ background: "none", border: "none", color: "#6060a0", cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            <div style={{ padding: "20px" }}>
+              {/* Basic Info */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Service Name</label>
+                <input type="text" style={S.input} value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })} placeholder="e.g., 🍕 Uber Eats" />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Description</label>
+                <input type="text" style={S.input} value={serviceForm.description} onChange={e => setServiceForm({ ...serviceForm, description: e.target.value })} placeholder="Internal description" />
+              </div>
+
+              {/* Open Message */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Open Message (shown when service picked)</label>
+                <textarea style={{ ...S.input, minHeight: 100 }} value={serviceForm.open_message_content} onChange={e => setServiceForm({ ...serviceForm, open_message_content: e.target.value })} placeholder="Welcome message..." />
+              </div>
+
+              {/* Closed Message */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Closed Message</label>
+                <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.closed_message_content} onChange={e => setServiceForm({ ...serviceForm, closed_message_content: e.target.value })} placeholder="Optional: message when service is closed" />
+              </div>
+
+              {/* Queue Messages */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Queue Full Message</label>
+                <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.queue_full_message_content} onChange={e => setServiceForm({ ...serviceForm, queue_full_message_content: e.target.value })} placeholder="Message when queue is full" />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Queue Break Message</label>
+                <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.queue_break_message_content} onChange={e => setServiceForm({ ...serviceForm, queue_break_message_content: e.target.value })} placeholder="Message when service on break" />
+              </div>
+
+              {/* Toggles */}
+              <div style={{ marginBottom: 20, display: "flex", gap: 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                  <input type="checkbox" checked={serviceForm.show_button_new_row} onChange={e => setServiceForm({ ...serviceForm, show_button_new_row: e.target.checked })} />
+                  Show button on new row
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                  <input type="checkbox" checked={serviceForm.webapp_mode} onChange={e => setServiceForm({ ...serviceForm, webapp_mode: e.target.checked })} />
+                  Webapp mode (experimental)
+                </label>
+              </div>
+
+              {/* Attach Questions */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Questions/URLs</label>
+                <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12 }}>
+                  {questions.length === 0 ? (
+                    <div style={{ color: "#6060a0", fontSize: 12 }}>No questions created yet</div>
+                  ) : (
+                    questions.map(q => (
+                      <label key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
+                        <input type="checkbox" checked={(serviceForm.attached_questions || []).includes(q.id)} onChange={() => toggleQuestionAttachment(q.id)} />
+                        <span style={{ color: "#e2e2f0" }}>{q.question}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={saveService} style={{ ...S.btn("#34d398"), flex: 1 }}>
+                  {editingService ? "✏️ Update Service" : "➕ Add Service"}
+                </button>
+                <button onClick={() => setShowServiceModal(false)} style={{ ...S.btnOutline, flex: 1 }}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Question Modal */}
+      {showQuestionModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ ...S.card, width: "90%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: 0 }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
+                {editingQuestion ? "Edit Question" : "Add New Question"}
+              </h3>
+              <button onClick={() => setShowQuestionModal(false)} style={{ background: "none", border: "none", color: "#6060a0", cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            <div style={{ padding: "20px" }}>
+              {/* Question Text */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Question Text</label>
+                <textarea style={{ ...S.input, minHeight: 80 }} value={questionForm.question_text} onChange={e => setQuestionForm({ ...questionForm, question_text: e.target.value })} placeholder="e.g., What's your delivery address?" />
+              </div>
+
+              {/* Question Type */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Response Type</label>
+                <select value={questionForm.question_type} onChange={e => setQuestionForm({ ...questionForm, question_type: e.target.value })} style={{ ...S.input, background: "#16161f" }}>
+                  <option value="text">📝 Free Text</option>
+                  <option value="number">🔢 Number Only</option>
+                  <option value="photo">📷 Photo Upload</option>
+                  <option value="inline_preset_buttons">🔘 Button Options</option>
+                  <option value="address">📍 Address (Google Maps)</option>
+                </select>
+              </div>
+
+              {/* Button Options */}
+              {questionForm.question_type === "inline_preset_buttons" && (
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Button Options</label>
+                  <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                    {questionForm.options && questionForm.options.map((opt, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                        <input type="text" disabled value={opt.option_text || opt} style={{ ...S.input, flex: 1, opacity: 0.7 }} />
+                        <button onClick={() => removeQuestionOption(idx)} style={{ ...S.btnOutline, fontSize: 11, padding: "6px 10px" }}>✕</button>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input type="text" style={S.input} placeholder="e.g., Delivery" value={newOption} onChange={e => setNewOption(e.target.value)} />
+                      <button onClick={addQuestionOption} style={{ ...S.btn(), fontSize: 12 }}>+ Add</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={saveQuestion} style={{ ...S.btn("#34d398"), flex: 1 }}>
+                  {editingQuestion ? "✏️ Update Question" : "➕ Add Question"}
+                </button>
+                <button onClick={() => setShowQuestionModal(false)} style={{ ...S.btnOutline, flex: 1 }}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
