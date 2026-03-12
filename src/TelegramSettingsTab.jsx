@@ -183,8 +183,8 @@ const TelegramSettingsTab = ({ node, api, S }) => {
             </div>
           ))}
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <input style={{ ...S.input, flex: 1 }} placeholder="/command" value={newCmd.cmd} onChange={e => setNewCmd({ ...newCmd, cmd: e.target.value })} />
-            <input style={{ ...S.input, flex: 2 }} placeholder="Description" value={newCmd.desc} onChange={e => setNewCmd({ ...newCmd, desc: e.target.value })} />
+            <input type="text" style={{ ...S.input, flex: 1 }} placeholder="/command" value={newCmd.cmd} onChange={e => setNewCmd({ ...newCmd, cmd: e.target.value })} />
+            <input type="text" style={{ ...S.input, flex: 2 }} placeholder="Description" value={newCmd.desc} onChange={e => setNewCmd({ ...newCmd, desc: e.target.value })} />
             <button onClick={addCommand} style={S.btn()}>+ Add</button>
           </div>
         </div>
@@ -201,21 +201,24 @@ const TelegramSettingsTab = ({ node, api, S }) => {
             Add the services your bot offers as clickable buttons for customers.
           </p>
           {services.map((s, i) => (
-            <div key={i} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div key={`service-${s.id || i}`} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input 
+                  type="text"
                   style={{ ...S.input, width: 50, fontSize: 16, textAlign: "center" }} 
-                  value={s.emoji} 
+                  value={s.emoji || "⭐"} 
                   onChange={e => updateService(i, "emoji", e.target.value)}
                   maxLength="2"
+                  placeholder="🍕"
                 />
                 <input 
+                  type="text"
                   style={{ ...S.input, flex: 1 }} 
                   value={s.name} 
                   onChange={e => updateService(i, "name", e.target.value)}
                   placeholder="Service name"
                 />
-                <button onClick={() => removeService(i)} style={{ ...S.btnOutline, fontSize: 11, padding: "3px 10px" }}>✕</button>
+                <button onClick={() => removeService(i)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}>Edit ✕</button>
               </div>
             </div>
           ))}
@@ -250,26 +253,33 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           </p>
 
           {/* Existing Questions */}
-          {questions.map((q, i) => {
-            const serviceName = services.find(s => s.id === q.service_id)?.name || "Unknown";
-            return (
-              <div key={i} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, color: "#60a5fa", marginBottom: 4 }}>Service: {serviceName}</div>
-                    <div style={{ fontSize: 13, color: "#e2e2f0", marginBottom: 6 }}>{q.question}</div>
-                    <div style={{ fontSize: 11, color: "#6060a0" }}>Type: {q.question_type}</div>
-                    {q.options && q.options.length > 0 && (
-                      <div style={{ fontSize: 11, color: "#6060a0", marginTop: 4 }}>
-                        Options: {q.options.map(o => o.option_text || o).join(", ")}
+          {questions.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 8, fontWeight: 600 }}>Existing Questions</div>
+              {questions.map((q, i) => {
+                const serviceName = services.find(s => s.id === q.service_id)?.name || "Unknown";
+                return (
+                  <div key={i} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: "#60a5fa", marginBottom: 4 }}>📌 {serviceName}</div>
+                        <div style={{ fontSize: 13, color: "#e2e2f0", marginBottom: 6, fontWeight: 600 }}>{q.question}</div>
+                        <div style={{ fontSize: 11, color: "#6060a0" }}>
+                          Type: <span style={{ color: "#a0a0c0" }}>{q.question_type}</span>
+                        </div>
+                        {q.options && q.options.length > 0 && (
+                          <div style={{ fontSize: 11, color: "#6060a0", marginTop: 4 }}>
+                            Options: {q.options.map(o => o.option_text || o).join(", ")}
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <button onClick={() => removeQuestion(i)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}>Edit ✕</button>
+                    </div>
                   </div>
-                  <button onClick={() => removeQuestion(i)} style={{ ...S.btnOutline, fontSize: 11, padding: "3px 10px" }}>✕</button>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
 
           {/* Add New Question */}
           <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "16px", marginTop: 12 }}>
