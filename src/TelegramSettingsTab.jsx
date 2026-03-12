@@ -32,6 +32,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
   const [questionForm, setQuestionForm] = useState({
     question_text: "",
+    message_content: "",
     question_type: "text",
     options: []
   });
@@ -176,6 +177,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       setEditingQuestion(question.id);
       setQuestionForm({
         question_text: question.question || "",
+        message_content: question.message_content || "",
         question_type: question.question_type || "text",
         options: question.options || []
       });
@@ -183,6 +185,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       setEditingQuestion(null);
       setQuestionForm({
         question_text: "",
+        message_content: "",
         question_type: "text",
         options: []
       });
@@ -199,10 +202,10 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     if (editingQuestion) {
       const idx = questions.findIndex(q => q.id === editingQuestion);
       const updated = [...questions];
-      updated[idx] = { ...updated[idx], question: questionForm.question_text, question_type: questionForm.question_type, options: questionForm.options };
+      updated[idx] = { ...updated[idx], question: questionForm.question_text, message_content: questionForm.message_content, question_type: questionForm.question_type, options: questionForm.options };
       setQuestions(updated);
     } else {
-      setQuestions([...questions, { id: Date.now(), question: questionForm.question_text, question_type: questionForm.question_type, options: questionForm.options }]);
+      setQuestions([...questions, { id: Date.now(), question: questionForm.question_text, message_content: questionForm.message_content, question_type: questionForm.question_type, options: questionForm.options }]);
     }
     setShowQuestionModal(false);
   };
@@ -451,6 +454,27 @@ const TelegramSettingsTab = ({ node, api, S }) => {
                   <option value="inline_preset_buttons">🔘 Button Options</option>
                   <option value="address">📍 Address (Google Maps)</option>
                 </select>
+              </div>
+
+              {/* Message Related Section */}
+              <div style={{ marginBottom: 20, background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 16 }}>
+                <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Message related</label>
+                <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>When the question is displayed, this is the actual question text that the user/customer will see.</p>
+                
+                <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Message content</label>
+                <div style={{ display: "flex", gap: 4, padding: "8px", background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 6, marginBottom: 12 }}>
+                  <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", fontWeight: "bold" }} title="Bold">B</button>
+                  <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", fontStyle: "italic" }} title="Italic">I</button>
+                  <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", textDecoration: "underline" }} title="Underline">U</button>
+                  <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Strikethrough">S</button>
+                  <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Code">&lt;/&gt;</button>
+                  <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Link">🔗</button>
+                </div>
+                
+                <textarea style={{ ...S.input, minHeight: 100 }} value={questionForm.message_content} onChange={e => setQuestionForm({ ...questionForm, message_content: e.target.value })} placeholder="e.g., What name would you like on the order?" />
+                
+                <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600, marginTop: 12 }}>Message image</label>
+                <button style={{ ...S.btnOutline, width: "100%", padding: "8px 12px", fontSize: 12 }}>Choose File - No file chosen</button>
               </div>
 
               {/* Button Options */}
