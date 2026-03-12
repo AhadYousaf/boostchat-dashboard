@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import TelegramSettingsTab from "./TelegramSettingsTab";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API = "https://onechat-backend-production.up.railway.app/api";
@@ -609,13 +610,10 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
   const [cutModal, setCutModal] = useState(false);
   const [cutPct, setCutPct] = useState("10");
 
-  // Telegram tab state
-  const [commands, setCommands] = useState([{ cmd:"/start", desc:"Start a brand new conversation with us #1" }]);
-  const [newCmd, setNewCmd] = useState({ cmd:"", desc:"" });
-  const [services, setServices] = useState([]);
-  const [newService, setNewService] = useState("");
-  const [questions, setQuestions] = useState([]);
-  const [newQuestion, setNewQuestion] = useState("");
+  // Telegram tab state (now handled by TelegramSettingsTab component)
+  // const [commands, setCommands] = useState([...]);  // REMOVED - component handles this
+  // const [services, setServices] = useState([]);     // REMOVED - component handles this
+  // const [questions, setQuestions] = useState([]);   // REMOVED - component handles this
 
   // Bot form
   const [botForm, setBotForm] = useState({ platform:"telegram", token:"", bot_name:"" });
@@ -755,85 +753,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
 
           {/* ── TELEGRAM ── */}
           {tab==="Telegram" && (
-            <div>
-              <SectionCard icon="✈" title="Telegram Settings" color="#60a5fa">
-                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>Telegram bot customisation</h3>
-                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
-                  Customize your Telegram bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your customers receive the best possible service.
-                </p>
-
-                {/* Commands */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:700 }}>Commands</div>
-                      <div style={{ fontSize:12, color:"#6060a0" }}>Telegram bots need start commands. It's the gateway to your bot's world and the first step towards engaging customers.</div>
-                    </div>
-                    <span style={{ color:"#6060a0" }}>›</span>
-                  </div>
-                  {commands.map((c,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <div>
-                        <span style={{ color:"#60a5fa", fontWeight:700, fontSize:13 }}>{c.cmd}</span>
-                        <div style={{ fontSize:12, color:"#6060a0" }}>{c.desc}</div>
-                      </div>
-                      <button onClick={() => setCommands(commands.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                    <input style={{ ...S.input, flex:1 }} placeholder="/command" value={newCmd.cmd} onChange={e=>setNewCmd({...newCmd,cmd:e.target.value})}/>
-                    <input style={{ ...S.input, flex:2 }} placeholder="Description" value={newCmd.desc} onChange={e=>setNewCmd({...newCmd,desc:e.target.value})}/>
-                    <button onClick={() => { if(newCmd.cmd){ setCommands([...commands,newCmd]); setNewCmd({cmd:"",desc:""}); }}} style={S.btn()}>+ Add</button>
-                  </div>
-                </div>
-
-                {/* Services */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Services / Buttons</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Add the services your bot offers as clickable buttons for customers.</div>
-                  {services.map((s,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:13 }}>{s}</span>
-                      <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                    <input style={{ ...S.input, flex:1 }} placeholder="e.g. Uber Eats $50+" value={newService} onChange={e=>setNewService(e.target.value)}/>
-                    <button onClick={() => { if(newService){ setServices([...services,newService]); setNewService(""); }}} style={S.btn()}>+ Add</button>
-                  </div>
-                </div>
-
-                {/* Questions */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Questions</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To unlock the full potential of your services, you need to gather information from your customers.</div>
-                  {questions.map((q,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:13 }}>{q}</span>
-                      <button onClick={() => setQuestions(questions.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                    <input style={{ ...S.input, flex:1 }} placeholder="e.g. What is your delivery address?" value={newQuestion} onChange={e=>setNewQuestion(e.target.value)}/>
-                    <button onClick={() => { if(newQuestion){ setQuestions([...questions,newQuestion]); setNewQuestion(""); }}} style={S.btn()}>+ Add</button>
-                  </div>
-                </div>
-
-                {/* Misc */}
-                <div style={{ marginBottom:8 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
-                  <SettingRow icon="🔔" title="Internal alert system" desc="Customize your bot's preset responses for a more personalized and engaging user experience." color="#f59e0b"/>
-                  <SettingRow icon="⌨" title="Internal commands" desc="Toggle whether you want your customers to have access to certain commands that we use internal." color="#60a5fa"/>
-                  <SettingRow icon="🔑" title="API keys" desc="Some functionality on BoostChat is too expensive to run on your behalf. Add your own API keys here." color="#a78bfa"/>
-                </div>
-
-                <div style={{ marginTop:16 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Announcements</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Announcements let you send messages with preset button URLs that can direct your customers straight to your bot.</div>
-                  <button style={{ ...S.btn(), fontSize:12 }}>+ New Announcement</button>
-                </div>
-              </SectionCard>
-            </div>
+            <TelegramSettingsTab node={node} api={api} S={S} />
           )}
 
           {/* ── BOOSTCHAT ── */}
