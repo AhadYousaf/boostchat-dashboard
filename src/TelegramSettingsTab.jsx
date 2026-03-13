@@ -455,6 +455,9 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         toggleServiceAttachment={toggleServiceAttachment}
         saveCommand={saveCommand}
         setShowCommandModal={setShowCommandModal}
+        handleFileUpload={handleFileUpload}
+        fileInputKey={fileInputKey}
+        setFileInputKey={setFileInputKey}
         S={S}
       />}
 
@@ -481,6 +484,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         removeQuestionOption={removeQuestionOption}
         saveQuestion={saveQuestion}
         setShowQuestionModal={setShowQuestionModal}
+        handleFileUpload={handleFileUpload}
         S={S}
       />}
     </div>
@@ -489,7 +493,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
 // Modal Components for TelegramSettingsTab
 
-const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, toggleServiceAttachment, saveCommand, setShowCommandModal, S }) => (
+const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, toggleServiceAttachment, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, setFileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -685,7 +689,7 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
   </div>
 );
 
-const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOption, setNewOption, addQuestionOption, removeQuestionOption, saveQuestion, setShowQuestionModal, S }) => (
+const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOption, setNewOption, addQuestionOption, removeQuestionOption, saveQuestion, setShowQuestionModal, handleFileUpload, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
