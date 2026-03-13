@@ -179,12 +179,12 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     }
   };
 
-  const toggleServiceAttachment = (serviceId) => {
+  const toggleServiceAttachment = (serviceName) => {
     const attached = commandForm.attached_services || [];
-    if (attached.includes(serviceId)) {
-      setCommandForm({ ...commandForm, attached_services: attached.filter(s => s !== serviceId) });
+    if (attached.includes(serviceName)) {
+      setCommandForm({ ...commandForm, attached_services: attached.filter(s => s !== serviceName) });
     } else {
-      setCommandForm({ ...commandForm, attached_services: [...attached, serviceId] });
+      setCommandForm({ ...commandForm, attached_services: [...attached, serviceName] });
     }
   };
 
@@ -581,7 +581,7 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
             ) : (
               services.map(s => (
                 <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
-                  <input type="checkbox" checked={(commandForm.attached_services || []).includes(s.id)} onChange={() => toggleServiceAttachment(s.id)} />
+                  <input type="checkbox" checked={(commandForm.attached_services || []).includes(s.name)} onChange={() => toggleServiceAttachment(s.name)} />
                   <span style={{ color: "#e2e2f0" }}>{s.name}</span>
                 </label>
               ))
