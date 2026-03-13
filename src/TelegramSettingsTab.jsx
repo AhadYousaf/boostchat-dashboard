@@ -44,11 +44,24 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   const [questionForm, setQuestionForm] = useState({
     question_text: "",
     message_content: "",
+    message_image: null,
     question_type: "text",
     options: []
   });
 
   const [newOption, setNewOption] = useState("");
+  const [fileInputKey, setFileInputKey] = useState(0);
+
+  // File upload handler
+  const handleFileUpload = (file, callback) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      callback(e.target.result);
+      setFileInputKey(prev => prev + 1); // Reset file input
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Load settings on mount
   useEffect(() => {
@@ -74,41 +87,45 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     setSaving(true);
     setError("");
     try {
-      await api(`/nodes/${node.id}/settings`, {
+      const payload = {
+        commands: commands.map(c => ({
+          cmd: c.cmd || c.command || "",
+          desc: c.desc || c.description || "",
+          message_content: c.message_content || "",
+          message_image: c.message_image || null,
+          attached_services: Array.isArray(c.attached_services) ? c.attached_services : []
+        })),
+        services: services.map(s => ({
+          id: s.id,
+          name: s.name || "",
+          description: s.description || "",
+          open_message_content: s.open_message_content || "",
+          closed_message_content: s.closed_message_content || "",
+          queue_full_message_content: s.queue_full_message_content || "",
+          queue_break_message_content: s.queue_break_message_content || "",
+          show_button_new_row: s.show_button_new_row || false,
+          webapp_mode: s.webapp_mode || false,
+          attached_questions: Array.isArray(s.attached_questions) ? s.attached_questions : []
+        })),
+        questions: questions.map(q => ({
+          id: q.id,
+          question: q.question || "",
+          message_content: q.message_content || "",
+          question_type: q.question_type || "text",
+          options: Array.isArray(q.options) ? q.options : []
+        }))
+      };
+      
+      const response = await api(`/nodes/${node.id}/settings`, {
         method: "PUT",
-        body: {
-          commands: commands.map((c, i) => ({
-            cmd: c.cmd || c.command,
-            desc: c.desc || c.description,
-            message_content: c.message_content || "",
-            message_image: c.message_image || null,
-            attached_services: c.attached_services || []
-          })),
-          services: services.map(s => ({
-            id: s.id,
-            name: s.name,
-            description: s.description,
-            open_message_content: s.open_message_content,
-            closed_message_content: s.closed_message_content,
-            queue_full_message_content: s.queue_full_message_content,
-            queue_break_message_content: s.queue_break_message_content,
-            show_button_new_row: s.show_button_new_row,
-            webapp_mode: s.webapp_mode,
-            attached_questions: s.attached_questions || []
-          })),
-          questions: questions.map(q => ({
-            id: q.id,
-            question_text: q.question,
-            message_content: q.message_content,
-            question_type: q.question_type,
-            options: q.options || []
-          }))
-        }
+        body: payload
       });
+      
       alert("✅ Settings saved!");
       await loadSettings();
     } catch (err) {
-      setError(err.message);
+      console.error("Save error:", err);
+      setError(err.message || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -248,6 +265,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       setQuestionForm({
         question_text: question.question || "",
         message_content: question.message_content || "",
+        message_image: question.message_image || null,
         question_type: question.question_type || "text",
         options: question.options || []
       });
@@ -256,6 +274,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       setQuestionForm({
         question_text: "",
         message_content: "",
+        message_image: null,
         question_type: "text",
         options: []
       });
@@ -276,6 +295,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         ...updated[idx], 
         question: questionForm.question_text, 
         message_content: questionForm.message_content,
+        message_image: questionForm.message_image,
         question_type: questionForm.question_type, 
         options: questionForm.options 
       };
@@ -285,6 +305,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         id: Date.now(), 
         question: questionForm.question_text,
         message_content: questionForm.message_content,
+        message_image: questionForm.message_image,
         question_type: questionForm.question_type, 
         options: questionForm.options 
       }]);
@@ -509,7 +530,41 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
           <textarea style={{ ...S.input, minHeight: 100 }} value={commandForm.message_content} onChange={e => setCommandForm({ ...commandForm, message_content: e.target.value })} placeholder="Welcome message..." />
           
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600, marginTop: 12 }}>Message image</label>
-          <button style={{ ...S.btnOutline, width: "100%", padding: "8px 12px", fontSize: 12 }}>Choose File - No file chosen</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input 
+              key={fileInputKey}
+              type="file" 
+              accept="image/*"
+              onChange={(e) => {
+                if (e.target.files[0]) {
+                  handleFileUpload(e.target.files[0], (base64) => {
+                    setCommandForm({ ...commandForm, message_image: base64 });
+                  });
+                }
+              }}
+              style={{ display: "none" }}
+              id="cmd-file-input"
+            />
+            <button 
+              onClick={() => document.getElementById("cmd-file-input").click()}
+              style={{ ...S.btnOutline, flex: 1, padding: "8px 12px", fontSize: 12 }}
+            >
+              Choose File - {commandForm.message_image ? "✓ Image selected" : "No file chosen"}
+            </button>
+            {commandForm.message_image && (
+              <button 
+                onClick={() => setCommandForm({ ...commandForm, message_image: null })}
+                style={{ ...S.btnOutline, padding: "8px 12px", fontSize: 12, color: "#e05050" }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {commandForm.message_image && (
+            <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", maxHeight: 150 }}>
+              <img src={commandForm.message_image} alt="Preview" style={{ width: "100%", height: "auto", maxHeight: 150, objectFit: "cover" }} />
+            </div>
+          )}
         </div>
 
         {/* Services/Buttons */}
@@ -677,7 +732,40 @@ const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOpti
           <textarea style={{ ...S.input, minHeight: 100 }} value={questionForm.message_content} onChange={e => setQuestionForm({ ...questionForm, message_content: e.target.value })} placeholder="e.g., What name would you like on the order?" />
           
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600, marginTop: 12 }}>Message image</label>
-          <button style={{ ...S.btnOutline, width: "100%", padding: "8px 12px", fontSize: 12 }}>Choose File - No file chosen</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input 
+              type="file" 
+              accept="image/*"
+              onChange={(e) => {
+                if (e.target.files[0]) {
+                  handleFileUpload(e.target.files[0], (base64) => {
+                    setQuestionForm({ ...questionForm, message_image: base64 });
+                  });
+                }
+              }}
+              style={{ display: "none" }}
+              id="q-file-input"
+            />
+            <button 
+              onClick={() => document.getElementById("q-file-input").click()}
+              style={{ ...S.btnOutline, flex: 1, padding: "8px 12px", fontSize: 12 }}
+            >
+              Choose File - {questionForm.message_image ? "✓ Image selected" : "No file chosen"}
+            </button>
+            {questionForm.message_image && (
+              <button 
+                onClick={() => setQuestionForm({ ...questionForm, message_image: null })}
+                style={{ ...S.btnOutline, padding: "8px 12px", fontSize: 12, color: "#e05050" }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {questionForm.message_image && (
+            <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", maxHeight: 150 }}>
+              <img src={questionForm.message_image} alt="Preview" style={{ width: "100%", height: "auto", maxHeight: 150, objectFit: "cover" }} />
+            </div>
+          )}
         </div>
 
         {/* Button Options */}
