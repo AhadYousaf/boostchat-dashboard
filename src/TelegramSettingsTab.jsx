@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ButtonLayoutEditor from "./ButtonLayoutEditor";
 
 const TelegramSettingsTab = ({ node, api, S }) => {
   const [loading, setLoading] = useState(false);
@@ -181,13 +182,20 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     }
   };
 
-  const toggleServiceAttachment = (serviceName) => {
-    const attached = commandForm.attached_services || [];
-    if (attached.includes(serviceName)) {
-      setCommandForm({ ...commandForm, attached_services: attached.filter(s => s !== serviceName) });
-    } else {
-      setCommandForm({ ...commandForm, attached_services: [...attached, serviceName] });
+  const reorderButtonLayout = (fromIdx, toIdx) => {
+    const newOrder = [...(commandForm.attached_services || [])];
+    [newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]];
+    setCommandForm({ ...commandForm, attached_services: newOrder });
+  };
+
+  const addButtonToLayout = (serviceName) => {
+    if (!(commandForm.attached_services || []).includes(serviceName)) {
+      setCommandForm({ ...commandForm, attached_services: [...(commandForm.attached_services || []), serviceName] });
     }
+  };
+
+  const removeButtonFromLayout = (idx) => {
+    setCommandForm({ ...commandForm, attached_services: (commandForm.attached_services || []).filter((_, i) => i !== idx) });
   };
 
   // =============== SERVICES ===============
@@ -378,7 +386,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
                 <div style={{ fontSize: 12, color: "#6060a0" }}>{c.desc || c.description}</div>
                 {(c.attached_services || []).length > 0 && (
                   <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
-                    {c.attached_services.length} service(s) attached
+                    {c.attached_services.length} button(s) in layout
                   </div>
                 )}
               </div>
@@ -464,7 +472,9 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         commandForm={commandForm} 
         setCommandForm={setCommandForm}
         services={services}
-        toggleServiceAttachment={toggleServiceAttachment}
+        reorderButtonLayout={reorderButtonLayout}
+        addButtonToLayout={addButtonToLayout}
+        removeButtonFromLayout={removeButtonFromLayout}
         saveCommand={saveCommand}
         setShowCommandModal={setShowCommandModal}
         handleFileUpload={handleFileUpload}
@@ -507,7 +517,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
 // =============== MODALS ===============
 
-const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, toggleServiceAttachment, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
+const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, reorderButtonLayout, addButtonToLayout, removeButtonFromLayout, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -573,22 +583,15 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
           )}
         </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Services/Buttons</label>
-          <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>Select which services to display when this command is used.</p>
-          <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, maxHeight: 200, overflowY: "auto" }}>
-            {services.length === 0 ? (
-              <div style={{ color: "#6060a0", fontSize: 12 }}>No services created yet</div>
-            ) : (
-              services.map(s => (
-                <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
-                  <input type="checkbox" checked={(commandForm.attached_services || []).includes(s.name)} onChange={() => toggleServiceAttachment(s.name)} />
-                  <span style={{ color: "#e2e2f0" }}>{s.name}</span>
-                </label>
-              ))
-            )}
-          </div>
-        </div>
+        {/* BUTTON LAYOUT EDITOR */}
+        <ButtonLayoutEditor
+          services={services}
+          attachedServices={commandForm.attached_services}
+          onReorder={reorderButtonLayout}
+          onAdd={addButtonToLayout}
+          onRemove={removeButtonFromLayout}
+          S={S}
+        />
 
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={saveCommand} style={{ ...S.btn("#34d398"), flex: 1 }}>
