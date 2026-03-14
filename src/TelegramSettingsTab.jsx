@@ -18,7 +18,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   const [editingService, setEditingService] = useState(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(0);
-  const [draggedQuestionIdx, setDraggedQuestionIdx] = useState(null);
 
   // Command form
   const [commandForm, setCommandForm] = useState({
@@ -95,7 +94,10 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           queue_break_message_content: s.queue_break_message_content || "",
           show_button_new_row: s.show_button_new_row || false,
           webapp_mode: s.webapp_mode || false,
-          attached_questions: Array.isArray(s.attached_questions) ? s.attached_questions : []
+          attached_questions: (s.attached_questions || []).map(qIdOrName => {
+            const q = questions.find(qu => qu.id === qIdOrName || qu.question === qIdOrName);
+            return q ? q.question : qIdOrName;
+          })
         })),
         questions: questions.map(q => ({
           id: q.id,
@@ -111,12 +113,11 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         body: payload
       });
       
-      alert("✅ Settings saved!");
+      setSaving(false);
       await loadSettings();
     } catch (err) {
       console.error("Save error:", err);
       setError(err.message || "Failed to save settings");
-    } finally {
       setSaving(false);
     }
   };
@@ -258,14 +259,14 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     setServiceForm({ ...serviceForm, attached_questions: newOrder });
   };
 
-  const addQuestionToService = (questionId) => {
-    if (!(serviceForm.attached_questions || []).includes(questionId)) {
-      setServiceForm({ ...serviceForm, attached_questions: [...(serviceForm.attached_questions || []), questionId] });
+  const addQuestionToService = (questionName) => {
+    if (!(serviceForm.attached_questions || []).includes(questionName)) {
+      setServiceForm({ ...serviceForm, attached_questions: [...(serviceForm.attached_questions || []), questionName] });
     }
   };
 
-  const removeQuestionFromService = (questionId) => {
-    setServiceForm({ ...serviceForm, attached_questions: (serviceForm.attached_questions || []).filter(q => q !== questionId) });
+  const removeQuestionFromService = (questionName) => {
+    setServiceForm({ ...serviceForm, attached_questions: (serviceForm.attached_questions || []).filter(q => q !== questionName) });
   };
 
   // =============== QUESTIONS ===============
@@ -326,10 +327,11 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
   const deleteQuestion = (id) => {
     if (confirm("Delete this question?")) {
+      const questionToDelete = questions.find(q => q.id === id);
       setQuestions(questions.filter(q => q.id !== id));
       setServices(services.map(s => ({
         ...s,
-        attached_questions: (s.attached_questions || []).filter(qId => qId !== id)
+        attached_questions: (s.attached_questions || []).filter(qName => qName !== questionToDelete?.question)
       })));
     }
   };
@@ -661,11 +663,11 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
             {(serviceForm.attached_questions || []).length === 0 ? (
               <div style={{ color: "#6060a0", fontSize: 12, padding: "20px", textAlign: "center" }}>No questions attached yet. Add from below.</div>
             ) : (
-              (serviceForm.attached_questions || []).map((qId, idx) => {
-                const q = questions.find(qu => qu.id === qId);
+              (serviceForm.attached_questions || []).map((qName, idx) => {
+                const q = questions.find(qu => qu.question === qName);
                 if (!q) return null;
                 return (
-                  <div key={qId} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', idx); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                  <div key={qName} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', idx); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
                     e.preventDefault();
                     const draggedIdx = parseInt(e.dataTransfer.getData('text/plain'));
                     if (draggedIdx !== idx) {
@@ -675,7 +677,7 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
                     <span style={{ color: "#60a5fa", userSelect: "none" }}>⋮⋮</span>
                     <span style={{ color: "#e2e2f0", flex: 1 }}>{idx + 1}. {q.question}</span>
                     <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
-                    <button onClick={() => removeQuestionFromService(qId)} style={{ background: "none", border: "none", color: "#e05050", cursor: "pointer", fontSize: 14 }}>✕</button>
+                    <button onClick={() => removeQuestionFromService(qName)} style={{ background: "none", border: "none", color: "#e05050", cursor: "pointer", fontSize: 14 }}>✕</button>
                   </div>
                 );
               })
@@ -690,7 +692,7 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
             ) : (
               questions.map(q => (
                 <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
-                  <button onClick={() => addQuestionToService(q.id)} style={{ background: "none", border: "none", color: "#34d398", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
+                  <button onClick={() => addQuestionToService(q.question)} style={{ background: "none", border: "none", color: "#34d398", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
                   <span style={{ color: "#e2e2f0", flex: 1 }}>{q.question}</span>
                   <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
                 </div>
