@@ -17,6 +17,8 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   const [editingCommand, setEditingCommand] = useState(null);
   const [editingService, setEditingService] = useState(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const [draggedQuestionIdx, setDraggedQuestionIdx] = useState(null);
 
   // Command form
   const [commandForm, setCommandForm] = useState({
@@ -50,18 +52,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   });
 
   const [newOption, setNewOption] = useState("");
-  const [fileInputKey, setFileInputKey] = useState(0);
-
-  // File upload handler
-  const handleFileUpload = (file, callback) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      callback(e.target.result);
-      setFileInputKey(prev => prev + 1); // Reset file input
-    };
-    reader.readAsDataURL(file);
-  };
 
   // Load settings on mount
   useEffect(() => {
@@ -129,6 +119,17 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // File upload handler
+  const handleFileUpload = (file, callback) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      callback(e.target.result);
+      setFileInputKey(prev => prev + 1);
+    };
+    reader.readAsDataURL(file);
   };
 
   // =============== COMMANDS ===============
@@ -243,18 +244,28 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       setServices(services.filter(s => s.id !== id));
       setCommands(commands.map(c => ({
         ...c,
-        attached_services: (c.attached_services || []).filter(sId => sId !== id)
+        attached_services: (c.attached_services || []).filter(sName => {
+          const service = services.find(s => s.id === id);
+          return sName !== service?.name;
+        })
       })));
     }
   };
 
-  const toggleQuestionAttachment = (questionId) => {
-    const attached = serviceForm.attached_questions || [];
-    if (attached.includes(questionId)) {
-      setServiceForm({ ...serviceForm, attached_questions: attached.filter(q => q !== questionId) });
-    } else {
-      setServiceForm({ ...serviceForm, attached_questions: [...attached, questionId] });
+  const reorderQuestions = (fromIdx, toIdx) => {
+    const newOrder = [...(serviceForm.attached_questions || [])];
+    [newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]];
+    setServiceForm({ ...serviceForm, attached_questions: newOrder });
+  };
+
+  const addQuestionToService = (questionId) => {
+    if (!(serviceForm.attached_questions || []).includes(questionId)) {
+      setServiceForm({ ...serviceForm, attached_questions: [...(serviceForm.attached_questions || []), questionId] });
     }
+  };
+
+  const removeQuestionFromService = (questionId) => {
+    setServiceForm({ ...serviceForm, attached_questions: (serviceForm.attached_questions || []).filter(q => q !== questionId) });
   };
 
   // =============== QUESTIONS ===============
@@ -445,7 +456,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         </button>
       </div>
 
-      {/* MODALS WILL BE HERE */}
       {/* Command Modal */}
       {showCommandModal && <CommandModal 
         editingCommand={editingCommand} 
@@ -457,7 +467,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         setShowCommandModal={setShowCommandModal}
         handleFileUpload={handleFileUpload}
         fileInputKey={fileInputKey}
-        setFileInputKey={setFileInputKey}
         S={S}
       />}
 
@@ -467,7 +476,9 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         serviceForm={serviceForm}
         setServiceForm={setServiceForm}
         questions={questions}
-        toggleQuestionAttachment={toggleQuestionAttachment}
+        reorderQuestions={reorderQuestions}
+        addQuestionToService={addQuestionToService}
+        removeQuestionFromService={removeQuestionFromService}
         saveService={saveService}
         setShowServiceModal={setShowServiceModal}
         S={S}
@@ -485,15 +496,16 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         saveQuestion={saveQuestion}
         setShowQuestionModal={setShowQuestionModal}
         handleFileUpload={handleFileUpload}
+        fileInputKey={fileInputKey}
         S={S}
       />}
     </div>
   );
 };
 
-// Modal Components for TelegramSettingsTab
+// =============== MODALS ===============
 
-const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, toggleServiceAttachment, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, setFileInputKey, S }) => (
+const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, toggleServiceAttachment, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -504,33 +516,21 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
       </div>
 
       <div style={{ padding: "20px" }}>
-        {/* Command Name */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Command name</label>
           <input type="text" style={S.input} value={commandForm.cmd} onChange={e => setCommandForm({ ...commandForm, cmd: e.target.value })} placeholder="/start" />
         </div>
 
-        {/* Description */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Description</label>
           <input type="text" style={S.input} value={commandForm.desc} onChange={e => setCommandForm({ ...commandForm, desc: e.target.value })} placeholder="Internal description" />
         </div>
 
-        {/* Message Related */}
         <div style={{ marginBottom: 20, background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 16 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Message related</label>
           <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>The message and image that will be sent when this command is used.</p>
           
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Message content</label>
-          <div style={{ display: "flex", gap: 4, padding: "8px", background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 6, marginBottom: 12 }}>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", fontWeight: "bold" }} title="Bold">B</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", fontStyle: "italic" }} title="Italic">I</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", textDecoration: "underline" }} title="Underline">U</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Strikethrough">S</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Code">&lt;/&gt;</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Link">🔗</button>
-          </div>
-          
           <textarea style={{ ...S.input, minHeight: 100 }} value={commandForm.message_content} onChange={e => setCommandForm({ ...commandForm, message_content: e.target.value })} placeholder="Welcome message..." />
           
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600, marginTop: 12 }}>Message image</label>
@@ -571,7 +571,6 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
           )}
         </div>
 
-        {/* Services/Buttons */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Services/Buttons</label>
           <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>Select which services to display when this command is used.</p>
@@ -589,7 +588,6 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
           </div>
         </div>
 
-        {/* Buttons */}
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={saveCommand} style={{ ...S.btn("#34d398"), flex: 1 }}>
             {editingCommand ? "✏️ Update Command" : "➕ Add Command"}
@@ -601,7 +599,7 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, t
   </div>
 );
 
-const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, toggleQuestionAttachment, saveService, setShowServiceModal, S }) => (
+const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, reorderQuestions, addQuestionToService, removeQuestionFromService, saveService, setShowServiceModal, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -612,43 +610,36 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
       </div>
 
       <div style={{ padding: "20px" }}>
-        {/* Service Name */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Service name</label>
           <input type="text" style={S.input} value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })} placeholder="e.g., 🍕 Uber Eats" />
         </div>
 
-        {/* Description */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Description</label>
           <input type="text" style={S.input} value={serviceForm.description} onChange={e => setServiceForm({ ...serviceForm, description: e.target.value })} placeholder="Internal description" />
         </div>
 
-        {/* Open Message */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Open Message (shown when service picked)</label>
           <textarea style={{ ...S.input, minHeight: 100 }} value={serviceForm.open_message_content} onChange={e => setServiceForm({ ...serviceForm, open_message_content: e.target.value })} placeholder="Welcome message..." />
         </div>
 
-        {/* Closed Message */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Closed Message</label>
           <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.closed_message_content} onChange={e => setServiceForm({ ...serviceForm, closed_message_content: e.target.value })} placeholder="Optional: message when service is closed" />
         </div>
 
-        {/* Queue Full Message */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Queue Full Message</label>
           <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.queue_full_message_content} onChange={e => setServiceForm({ ...serviceForm, queue_full_message_content: e.target.value })} placeholder="Message when queue is full" />
         </div>
 
-        {/* Queue Break Message */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Queue Break Message</label>
           <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.queue_break_message_content} onChange={e => setServiceForm({ ...serviceForm, queue_break_message_content: e.target.value })} placeholder="Message when service on break" />
         </div>
 
-        {/* Toggles */}
         <div style={{ marginBottom: 20, display: "flex", gap: 16 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
             <input type="checkbox" checked={serviceForm.show_button_new_row} onChange={e => setServiceForm({ ...serviceForm, show_button_new_row: e.target.checked })} />
@@ -660,24 +651,54 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
           </label>
         </div>
 
-        {/* Questions */}
+        {/* QUESTIONS - DRAG TO REORDER */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Questions/URLs</label>
-          <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, maxHeight: 200, overflowY: "auto" }}>
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Questions (in order)</label>
+          <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 8 }}>Drag to reorder. Click X to remove.</p>
+          
+          {/* Attached Questions List */}
+          <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, marginBottom: 12, minHeight: 60 }}>
+            {(serviceForm.attached_questions || []).length === 0 ? (
+              <div style={{ color: "#6060a0", fontSize: 12, padding: "20px", textAlign: "center" }}>No questions attached yet. Add from below.</div>
+            ) : (
+              (serviceForm.attached_questions || []).map((qId, idx) => {
+                const q = questions.find(qu => qu.id === qId);
+                if (!q) return null;
+                return (
+                  <div key={qId} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', idx); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                    e.preventDefault();
+                    const draggedIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    if (draggedIdx !== idx) {
+                      reorderQuestions(draggedIdx, idx);
+                    }
+                  }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px", background: "#16161f", borderRadius: 6, marginBottom: 6, cursor: "move", border: "1px solid #2a2a3e", fontSize: 12 }}>
+                    <span style={{ color: "#60a5fa", userSelect: "none" }}>⋮⋮</span>
+                    <span style={{ color: "#e2e2f0", flex: 1 }}>{idx + 1}. {q.question}</span>
+                    <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
+                    <button onClick={() => removeQuestionFromService(qId)} style={{ background: "none", border: "none", color: "#e05050", cursor: "pointer", fontSize: 14 }}>✕</button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Available Questions to Add */}
+          <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Available questions:</label>
+          <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, maxHeight: 150, overflowY: "auto" }}>
             {questions.length === 0 ? (
               <div style={{ color: "#6060a0", fontSize: 12 }}>No questions created yet</div>
             ) : (
               questions.map(q => (
-                <label key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
-                  <input type="checkbox" checked={(serviceForm.attached_questions || []).includes(q.id)} onChange={() => toggleQuestionAttachment(q.id)} />
-                  <span style={{ color: "#e2e2f0" }}>{q.question}</span>
-                </label>
+                <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
+                  <button onClick={() => addQuestionToService(q.id)} style={{ background: "none", border: "none", color: "#34d398", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
+                  <span style={{ color: "#e2e2f0", flex: 1 }}>{q.question}</span>
+                  <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
+                </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Buttons */}
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={saveService} style={{ ...S.btn("#34d398"), flex: 1 }}>
             {editingService ? "✏️ Update Service" : "➕ Add Service"}
@@ -689,7 +710,7 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
   </div>
 );
 
-const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOption, setNewOption, addQuestionOption, removeQuestionOption, saveQuestion, setShowQuestionModal, handleFileUpload, S }) => (
+const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOption, setNewOption, addQuestionOption, removeQuestionOption, saveQuestion, setShowQuestionModal, handleFileUpload, fileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -700,13 +721,11 @@ const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOpti
       </div>
 
       <div style={{ padding: "20px" }}>
-        {/* Question Text */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Question Text</label>
-          <textarea style={{ ...S.input, minHeight: 80 }} value={questionForm.question_text} onChange={e => setQuestionForm({ ...questionForm, question_text: e.target.value })} placeholder="Internal question name (e.g., Ordername)" />
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Question Text (internal name)</label>
+          <textarea style={{ ...S.input, minHeight: 80 }} value={questionForm.question_text} onChange={e => setQuestionForm({ ...questionForm, question_text: e.target.value })} placeholder="e.g., Ordername" />
         </div>
 
-        {/* Response Type */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Response Type</label>
           <select value={questionForm.question_type} onChange={e => setQuestionForm({ ...questionForm, question_type: e.target.value })} style={{ ...S.input, background: "#16161f" }}>
@@ -718,21 +737,11 @@ const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOpti
           </select>
         </div>
 
-        {/* Message Related */}
         <div style={{ marginBottom: 20, background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 16 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Message related</label>
-          <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>When the question is displayed, this is the actual question text that the user/customer will see.</p>
+          <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>This is the actual question text shown to the customer.</p>
           
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Message content</label>
-          <div style={{ display: "flex", gap: 4, padding: "8px", background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 6, marginBottom: 12 }}>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", fontWeight: "bold" }} title="Bold">B</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", fontStyle: "italic" }} title="Italic">I</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer", textDecoration: "underline" }} title="Underline">U</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Strikethrough">S</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Code">&lt;/&gt;</button>
-            <button style={{ padding: "4px 8px", background: "transparent", border: "none", color: "#6060a0", cursor: "pointer" }} title="Link">🔗</button>
-          </div>
-          
           <textarea style={{ ...S.input, minHeight: 100 }} value={questionForm.message_content} onChange={e => setQuestionForm({ ...questionForm, message_content: e.target.value })} placeholder="e.g., What name would you like on the order?" />
           
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600, marginTop: 12 }}>Message image</label>
@@ -772,7 +781,6 @@ const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOpti
           )}
         </div>
 
-        {/* Button Options */}
         {questionForm.question_type === "inline_preset_buttons" && (
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Button Options</label>
@@ -791,7 +799,6 @@ const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOpti
           </div>
         )}
 
-        {/* Buttons */}
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={saveQuestion} style={{ ...S.btn("#34d398"), flex: 1 }}>
             {editingQuestion ? "✏️ Update Question" : "➕ Add Question"}
