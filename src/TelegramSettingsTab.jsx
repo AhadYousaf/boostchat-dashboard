@@ -99,7 +99,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         })),
         questions: questions.map(q => ({
           id: q.id,
-          question: q.question || "",
+          question: q.question || q.question_text || "",
           message_content: q.message_content || "",
           question_type: q.question_type || "text",
           options: Array.isArray(q.options) ? q.options : []
