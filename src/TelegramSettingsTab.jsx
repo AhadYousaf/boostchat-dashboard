@@ -97,7 +97,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           webapp_mode: s.webapp_mode || false,
           attached_questions: (s.attached_questions || []).map(qIdOrName => {
             const q = questions.find(qu => qu.id === qIdOrName || qu.question === qIdOrName);
-            return q ? q.question : qIdOrName;
+            return q ? q.id : qIdOrName;
           })
         })),
         questions: questions.map(q => ({
