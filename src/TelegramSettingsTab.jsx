@@ -95,10 +95,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           queue_break_message_content: s.queue_break_message_content || "",
           show_button_new_row: s.show_button_new_row || false,
           webapp_mode: s.webapp_mode || false,
-          attached_questions: (s.attached_questions || []).map(qIdOrName => {
-            const q = questions.find(qu => qu.id === qIdOrName || qu.question === qIdOrName);
-            return q ? q.id : qIdOrName;
-          })
+          attached_questions: Array.isArray(s.attached_questions) ? s.attached_questions : []
         })),
         questions: questions.map(q => ({
           id: q.id,
@@ -168,34 +165,16 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     if (editingCommand) {
       const idx = commands.findIndex(c => (c.id || c.command) === editingCommand);
       const updated = [...commands];
-      updated[idx] = { ...updated[idx], ...commandForm };
+      updated[idx] = { ...commandForm };
       setCommands(updated);
     } else {
-      setCommands([...commands, { id: Date.now(), ...commandForm }]);
+      setCommands([...commands, { ...commandForm }]);
     }
     setShowCommandModal(false);
   };
 
-  const deleteCommand = (id) => {
-    if (confirm("Delete this command?")) {
-      setCommands(commands.filter(c => (c.id || c.command) !== id));
-    }
-  };
-
-  const reorderButtonLayout = (fromIdx, toIdx) => {
-    const newOrder = [...(commandForm.attached_services || [])];
-    [newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]];
-    setCommandForm({ ...commandForm, attached_services: newOrder });
-  };
-
-  const addButtonToLayout = (serviceName) => {
-    if (!(commandForm.attached_services || []).includes(serviceName)) {
-      setCommandForm({ ...commandForm, attached_services: [...(commandForm.attached_services || []), serviceName] });
-    }
-  };
-
-  const removeButtonFromLayout = (idx) => {
-    setCommandForm({ ...commandForm, attached_services: (commandForm.attached_services || []).filter((_, i) => i !== idx) });
+  const deleteCommand = (cmd) => {
+    setCommands(commands.filter(c => (c.id || c.command) !== (cmd.id || cmd.command)));
   };
 
   // =============== SERVICES ===============
@@ -240,54 +219,52 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     if (editingService) {
       const idx = services.findIndex(s => s.id === editingService);
       const updated = [...services];
-      updated[idx] = { ...updated[idx], ...serviceForm };
+      updated[idx] = { ...serviceForm, id: editingService };
       setServices(updated);
     } else {
-      setServices([...services, { id: Date.now(), ...serviceForm }]);
+      setServices([...services, { ...serviceForm, id: Date.now().toString() }]);
     }
     setShowServiceModal(false);
   };
 
-  const deleteService = (id) => {
-    if (confirm("Delete this service?")) {
-      setServices(services.filter(s => s.id !== id));
-      setCommands(commands.map(c => ({
-        ...c,
-        attached_services: (c.attached_services || []).filter(sName => {
-          const service = services.find(s => s.id === id);
-          return sName !== service?.name;
-        })
-      })));
+  const deleteService = (serviceId) => {
+    setServices(services.filter(s => s.id !== serviceId));
+  };
+
+  const addQuestionToService = (questionId) => {
+    if (!serviceForm.attached_questions.includes(questionId)) {
+      setServiceForm({
+        ...serviceForm,
+        attached_questions: [...serviceForm.attached_questions, questionId]
+      });
     }
+  };
+
+  const removeQuestionFromService = (questionId) => {
+    setServiceForm({
+      ...serviceForm,
+      attached_questions: serviceForm.attached_questions.filter(id => id !== questionId)
+    });
   };
 
   const reorderQuestions = (fromIdx, toIdx) => {
-    const newOrder = [...(serviceForm.attached_questions || [])];
-    [newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]];
-    setServiceForm({ ...serviceForm, attached_questions: newOrder });
-  };
-
-  const addQuestionToService = (questionName) => {
-    if (!(serviceForm.attached_questions || []).includes(questionName)) {
-      setServiceForm({ ...serviceForm, attached_questions: [...(serviceForm.attached_questions || []), questionName] });
-    }
-  };
-
-  const removeQuestionFromService = (questionName) => {
-    setServiceForm({ ...serviceForm, attached_questions: (serviceForm.attached_questions || []).filter(q => q !== questionName) });
+    const updated = [...serviceForm.attached_questions];
+    const [removed] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, removed);
+    setServiceForm({ ...serviceForm, attached_questions: updated });
   };
 
   // =============== QUESTIONS ===============
 
-  const openQuestionModal = (question = null) => {
-    if (question) {
-      setEditingQuestion(question.id);
+  const openQuestionModal = (q = null) => {
+    if (q) {
+      setEditingQuestion(q.id);
       setQuestionForm({
-        question_text: question.question || "",
-        message_content: question.message_content || "",
-        message_image: question.message_image || null,
-        question_type: question.question_type || "text",
-        options: question.options || []
+        question_text: q.question || q.question_text || "",
+        message_content: q.message_content || "",
+        message_image: q.message_image || null,
+        question_type: q.question_type || "text",
+        options: q.options || []
       });
     } else {
       setEditingQuestion(null);
@@ -299,6 +276,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         options: []
       });
     }
+    setNewOption("");
     setShowQuestionModal(true);
   };
 
@@ -311,46 +289,47 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     if (editingQuestion) {
       const idx = questions.findIndex(q => q.id === editingQuestion);
       const updated = [...questions];
-      updated[idx] = { 
-        ...updated[idx], 
-        question: questionForm.question_text, 
-        message_content: questionForm.message_content,
-        message_image: questionForm.message_image,
-        question_type: questionForm.question_type, 
-        options: questionForm.options 
+      updated[idx] = {
+        ...questionForm,
+        id: editingQuestion,
+        question: questionForm.question_text,
+        options: questionForm.options || []
       };
       setQuestions(updated);
     } else {
-      setQuestions([...questions, { 
-        id: Date.now(), 
-        question: questionForm.question_text,
-        message_content: questionForm.message_content,
-        message_image: questionForm.message_image,
-        question_type: questionForm.question_type, 
-        options: questionForm.options 
-      }]);
+      const newId = Date.now().toString();
+      setQuestions([
+        ...questions,
+        {
+          id: newId,
+          question: questionForm.question_text,
+          message_content: questionForm.message_content,
+          message_image: questionForm.message_image,
+          question_type: questionForm.question_type,
+          options: questionForm.options || []
+        }
+      ]);
     }
     setShowQuestionModal(false);
   };
 
-  const deleteQuestion = (id) => {
-    if (confirm("Delete this question?")) {
-      const questionToDelete = questions.find(q => q.id === id);
-      setQuestions(questions.filter(q => q.id !== id));
-      setServices(services.map(s => ({
-        ...s,
-        attached_questions: (s.attached_questions || []).filter(qName => qName !== questionToDelete?.question)
-      })));
-    }
+  const deleteQuestion = (questionId) => {
+    setQuestions(questions.filter(q => q.id !== questionId));
+    // Remove from all services
+    setServices(services.map(s => ({
+      ...s,
+      attached_questions: (s.attached_questions || []).filter(id => id !== questionId)
+    })));
   };
 
   const addQuestionOption = () => {
-    if (!newOption) return;
-    setQuestionForm({
-      ...questionForm,
-      options: [...(questionForm.options || []), { option_text: newOption }]
-    });
-    setNewOption("");
+    if (newOption.trim()) {
+      setQuestionForm({
+        ...questionForm,
+        options: [...(questionForm.options || []), { option_text: newOption }]
+      });
+      setNewOption("");
+    }
   };
 
   const removeQuestionOption = (idx) => {
@@ -360,166 +339,114 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     });
   };
 
-  if (loading) {
-    return <div style={{ color: "#6060a0" }}>Loading settings...</div>;
-  }
+  if (loading) return <div style={{ padding: 20, color: "#e2e2f0" }}>Loading settings...</div>;
 
   return (
-    <div>
-      {error && (
-        <div style={{ background: "#e05050", color: "#fff", padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
-          ❌ {error}
-        </div>
-      )}
+    <div style={{ padding: "20px", maxWidth: 1200 }}>
+      {error && <div style={{ color: "#e05050", marginBottom: 16, padding: 12, background: "#1e0d0d", borderRadius: 6 }}>❌ {error}</div>}
 
-      {/* COMMANDS SECTION */}
-      <div style={{ ...S.card, marginBottom: 16 }}>
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#60a5fa" }}>📝</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>Commands</span>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700, color: "#e2e2f0" }}>📱 Telegram Configuration</h2>
+        <p style={{ margin: 0, fontSize: 13, color: "#8888b0" }}>Configure commands, services, and questions for your Telegram bot</p>
+      </div>
+
+      {/* COMMANDS TAB */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#e2e2f0" }}>Commands</h3>
+          <button onClick={() => openCommandModal()} style={{ ...S.btn("#34d398"), fontSize: 12, padding: "8px 14px" }}>+ Add Command</button>
         </div>
-        <div style={{ padding: "20px" }}>
-          {commands.map((c, i) => (
-            <div key={i} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "10px 16px", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 13 }}>{c.cmd || c.command}</span>
-                <div style={{ fontSize: 12, color: "#6060a0" }}>{c.desc || c.description}</div>
-                {(c.attached_services || []).length > 0 && (
-                  <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
-                    {c.attached_services.length} button(s) in layout
-                  </div>
-                )}
+        <div style={{ display: "grid", gap: 10 }}>
+          {commands.length === 0 ? (
+            <div style={{ color: "#6060a0", fontSize: 13, padding: "20px", background: "#0d0d12", borderRadius: 8, textAlign: "center" }}>No commands created yet</div>
+          ) : (
+            commands.map((cmd, idx) => (
+              <div key={cmd.id || cmd.command} style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: "#e2e2f0", fontWeight: 600, fontSize: 13 }}>{cmd.cmd || cmd.command}</div>
+                  <div style={{ color: "#6060a0", fontSize: 12 }}>{cmd.attached_services?.length || 0} service(s) attached</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => openCommandModal(cmd)} style={{ ...S.btnOutline, fontSize: 12, padding: "6px 12px" }}>✏️ Edit</button>
+                  <button onClick={() => deleteCommand(cmd)} style={{ ...S.btnOutline, color: "#e05050", fontSize: 12, padding: "6px 12px" }}>🗑️ Delete</button>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => openCommandModal(c)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>Edit</button>
-                <button onClick={() => deleteCommand(c.id || c.command)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", color: "#e05050" }}>✕</button>
-              </div>
-            </div>
-          ))}
-          <button onClick={() => openCommandModal()} style={{ ...S.btn("#34d398"), fontSize: 12, marginTop: 12 }}>+ Add Command</button>
+            ))
+          )}
         </div>
       </div>
 
-      {/* SERVICES SECTION */}
-      <div style={{ ...S.card, marginBottom: 16 }}>
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#60a5fa" }}>🎯</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>Services / Buttons</span>
+      {/* SERVICES TAB */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#e2e2f0" }}>Services</h3>
+          <button onClick={() => openServiceModal()} style={{ ...S.btn("#34d398"), fontSize: 12, padding: "8px 14px" }}>+ Add Service</button>
         </div>
-        <div style={{ padding: "20px" }}>
-          {services.map(s => (
-            <div key={s.id} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13, color: "#e2e2f0", fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 12, color: "#6060a0" }}>{s.description || "No description"}</div>
-                {(s.attached_questions || []).length > 0 && (
-                  <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
-                    {s.attached_questions.length} question(s) attached
-                  </div>
-                )}
+        <div style={{ display: "grid", gap: 10 }}>
+          {services.length === 0 ? (
+            <div style={{ color: "#6060a0", fontSize: 13, padding: "20px", background: "#0d0d12", borderRadius: 8, textAlign: "center" }}>No services created yet</div>
+          ) : (
+            services.map((svc, idx) => (
+              <div key={svc.id} style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: "#e2e2f0", fontWeight: 600, fontSize: 13 }}>{svc.name}</div>
+                  <div style={{ color: "#6060a0", fontSize: 12 }}>{svc.description || "No description"}</div>
+                  <div style={{ color: "#6060a0", fontSize: 12 }}>{(svc.attached_questions || []).length} question(s) attached</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => openServiceModal(svc)} style={{ ...S.btnOutline, fontSize: 12, padding: "6px 12px" }}>✏️ Edit</button>
+                  <button onClick={() => deleteService(svc.id)} style={{ ...S.btnOutline, color: "#e05050", fontSize: 12, padding: "6px 12px" }}>🗑️ Delete</button>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => openServiceModal(s)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>Edit</button>
-                <button onClick={() => deleteService(s.id)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", color: "#e05050" }}>✕</button>
-              </div>
-            </div>
-          ))}
-          <button onClick={() => openServiceModal()} style={{ ...S.btn("#34d398"), fontSize: 12, marginTop: 12 }}>+ Add Service</button>
-        </div>
-      </div>
-
-      {/* QUESTIONS SECTION */}
-      <div style={{ ...S.card, marginBottom: 16 }}>
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#60a5fa" }}>❓</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>Questions</span>
-        </div>
-        <div style={{ padding: "20px" }}>
-          {questions.map(q => (
-            <div key={q.id} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: "12px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, color: "#e2e2f0", fontWeight: 600 }}>{q.question}</div>
-                <div style={{ fontSize: 11, color: "#6060a0", marginTop: 4 }}>Type: {q.question_type}</div>
-                {q.options && q.options.length > 0 && (
-                  <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
-                    Options: {q.options.map(o => o.option_text || o).join(", ")}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => openQuestionModal(q)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>Edit</button>
-                <button onClick={() => deleteQuestion(q.id)} style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px", color: "#e05050" }}>✕</button>
-              </div>
-            </div>
-          ))}
-          <button onClick={() => openQuestionModal()} style={{ ...S.btn("#34d398"), fontSize: 12, marginTop: 12 }}>+ Add Question</button>
+            ))
+          )}
         </div>
       </div>
 
-      {/* SAVE BUTTONS */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 40 }}>
-        <button onClick={saveSettings} disabled={saving} style={{ ...S.btn("#34d398"), fontSize: 13, padding: "10px 20px" }}>
-          {saving ? "💾 Saving..." : "✅ Save All Settings"}
-        </button>
-        <button onClick={loadSettings} style={{ ...S.btnOutline, fontSize: 13, padding: "10px 20px" }}>
-          ↻ Reload
+      {/* QUESTIONS TAB */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#e2e2f0" }}>Questions</h3>
+          <button onClick={() => openQuestionModal()} style={{ ...S.btn("#34d398"), fontSize: 12, padding: "8px 14px" }}>+ Add Question</button>
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {questions.length === 0 ? (
+            <div style={{ color: "#6060a0", fontSize: 13, padding: "20px", background: "#0d0d12", borderRadius: 8, textAlign: "center" }}>No questions created yet</div>
+          ) : (
+            questions.map((q, idx) => (
+              <div key={q.id} style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: "#e2e2f0", fontWeight: 600, fontSize: 13 }}>{q.question || q.question_text}</div>
+                  <div style={{ color: "#6060a0", fontSize: 12 }}>Type: {q.question_type}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => openQuestionModal(q)} style={{ ...S.btnOutline, fontSize: 12, padding: "6px 12px" }}>✏️ Edit</button>
+                  <button onClick={() => deleteQuestion(q.id)} style={{ ...S.btnOutline, color: "#e05050", fontSize: 12, padding: "6px 12px" }}>🗑️ Delete</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* SAVE BUTTON */}
+      <div style={{ position: "sticky", bottom: 0, background: "#0d0d12", borderTop: "1px solid #2a2a3e", padding: "16px", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button onClick={saveSettings} disabled={saving} style={{ ...S.btn("#34d398"), padding: "10px 20px", fontSize: 13, fontWeight: 600 }}>
+          {saving ? "Saving..." : "✅ Save All Settings"}
         </button>
       </div>
 
-      {/* Command Modal */}
-      {showCommandModal && <CommandModal 
-        editingCommand={editingCommand} 
-        commandForm={commandForm} 
-        setCommandForm={setCommandForm}
-        services={services}
-        reorderButtonLayout={reorderButtonLayout}
-        addButtonToLayout={addButtonToLayout}
-        removeButtonFromLayout={removeButtonFromLayout}
-        saveCommand={saveCommand}
-        setShowCommandModal={setShowCommandModal}
-        handleFileUpload={handleFileUpload}
-        fileInputKey={fileInputKey}
-        S={S}
-      />}
-
-      {/* Service Modal */}
-      {showServiceModal && <ServiceModal 
-        editingService={editingService}
-        serviceForm={serviceForm}
-        setServiceForm={setServiceForm}
-        questions={questions}
-        reorderQuestions={reorderQuestions}
-        addQuestionToService={addQuestionToService}
-        removeQuestionFromService={removeQuestionFromService}
-        saveService={saveService}
-        setShowServiceModal={setShowServiceModal}
-        S={S}
-      />}
-
-      {/* Question Modal */}
-      {showQuestionModal && <QuestionModal
-        editingQuestion={editingQuestion}
-        questionForm={questionForm}
-        setQuestionForm={setQuestionForm}
-        newOption={newOption}
-        setNewOption={setNewOption}
-        addQuestionOption={addQuestionOption}
-        removeQuestionOption={removeQuestionOption}
-        saveQuestion={saveQuestion}
-        setShowQuestionModal={setShowQuestionModal}
-        handleFileUpload={handleFileUpload}
-        fileInputKey={fileInputKey}
-        S={S}
-      />}
+      {/* MODALS */}
+      {showCommandModal && <CommandModal editingCommand={editingCommand} commandForm={commandForm} setCommandForm={setCommandForm} services={services} saveCommand={saveCommand} setShowCommandModal={setShowCommandModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
+      {showServiceModal && <ServiceModal editingService={editingService} serviceForm={serviceForm} setServiceForm={setServiceForm} questions={questions} addQuestionToService={addQuestionToService} removeQuestionFromService={removeQuestionFromService} reorderQuestions={reorderQuestions} saveService={saveService} setShowServiceModal={setShowServiceModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
+      {showQuestionModal && <QuestionModal editingQuestion={editingQuestion} questionForm={questionForm} setQuestionForm={setQuestionForm} newOption={newOption} setNewOption={setNewOption} addQuestionOption={addQuestionOption} removeQuestionOption={removeQuestionOption} saveQuestion={saveQuestion} setShowQuestionModal={setShowQuestionModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
     </div>
   );
 };
 
-// =============== MODALS ===============
-
-const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, reorderButtonLayout, addButtonToLayout, removeButtonFromLayout, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
+const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
-    <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
+    <div style={{ ...S.card, width: "90%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
           {editingCommand ? "Edit Command" : "Add New Command"}
@@ -529,69 +456,34 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, r
 
       <div style={{ padding: "20px" }}>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Command name</label>
-          <input type="text" style={S.input} value={commandForm.cmd} onChange={e => setCommandForm({ ...commandForm, cmd: e.target.value })} placeholder="/start" />
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Command</label>
+          <input type="text" style={S.input} value={commandForm.cmd} onChange={e => setCommandForm({ ...commandForm, cmd: e.target.value })} placeholder="e.g., /start" />
         </div>
 
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Description</label>
-          <input type="text" style={S.input} value={commandForm.desc} onChange={e => setCommandForm({ ...commandForm, desc: e.target.value })} placeholder="Internal description" />
+          <input type="text" style={S.input} value={commandForm.desc} onChange={e => setCommandForm({ ...commandForm, desc: e.target.value })} placeholder="Internal note" />
         </div>
 
-        <div style={{ marginBottom: 20, background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 16 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Message related</label>
-          <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 12 }}>The message and image that will be sent when this command is used.</p>
-          
-          <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Message content</label>
-          <textarea style={{ ...S.input, minHeight: 100 }} value={commandForm.message_content} onChange={e => setCommandForm({ ...commandForm, message_content: e.target.value })} placeholder="Welcome message..." />
-          
-          <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600, marginTop: 12 }}>Message image</label>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Message Content</label>
+          <textarea style={{ ...S.input, minHeight: 100 }} value={commandForm.message_content} onChange={e => setCommandForm({ ...commandForm, message_content: e.target.value })} placeholder="What to say when user uses this command" />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Message Image</label>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input 
-              key={fileInputKey}
-              type="file" 
-              accept="image/*"
-              onChange={(e) => {
-                if (e.target.files[0]) {
-                  handleFileUpload(e.target.files[0], (base64) => {
-                    setCommandForm({ ...commandForm, message_image: base64 });
-                  });
-                }
-              }}
-              style={{ display: "none" }}
-              id="cmd-file-input"
-            />
-            <button 
-              onClick={() => document.getElementById("cmd-file-input").click()}
-              style={{ ...S.btnOutline, flex: 1, padding: "8px 12px", fontSize: 12 }}
-            >
-              Choose File - {commandForm.message_image ? "✓ Image selected" : "No file chosen"}
-            </button>
-            {commandForm.message_image && (
-              <button 
-                onClick={() => setCommandForm({ ...commandForm, message_image: null })}
-                style={{ ...S.btnOutline, padding: "8px 12px", fontSize: 12, color: "#e05050" }}
-              >
-                Remove
-              </button>
-            )}
+            <input type="file" accept="image/*" onChange={e => { if (e.target.files[0]) { handleFileUpload(e.target.files[0], (base64) => { setCommandForm({ ...commandForm, message_image: base64 }); }); } }} style={{ display: "none" }} id="cmd-file-input" key={fileInputKey} />
+            <button onClick={() => document.getElementById("cmd-file-input").click()} style={{ ...S.btnOutline, flex: 1, padding: "8px 12px", fontSize: 12 }}>Choose File - {commandForm.message_image ? "✓ Image selected" : "No file chosen"}</button>
+            {commandForm.message_image && <button onClick={() => setCommandForm({ ...commandForm, message_image: null })} style={{ ...S.btnOutline, padding: "8px 12px", fontSize: 12, color: "#e05050" }}>Remove</button>}
           </div>
-          {commandForm.message_image && (
-            <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", maxHeight: 150 }}>
-              <img src={commandForm.message_image} alt="Preview" style={{ width: "100%", height: "auto", maxHeight: 150, objectFit: "cover" }} />
-            </div>
-          )}
+          {commandForm.message_image && <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", maxHeight: 150 }}><img src={commandForm.message_image} alt="Preview" style={{ width: "100%", height: "auto", maxHeight: 150, objectFit: "cover" }} /></div>}
         </div>
 
-        {/* BUTTON LAYOUT EDITOR */}
-        <ButtonLayoutEditor
-          services={services}
-          attachedServices={commandForm.attached_services}
-          onReorder={reorderButtonLayout}
-          onAdd={addButtonToLayout}
-          onRemove={removeButtonFromLayout}
-          S={S}
-        />
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Services/Buttons Layout</label>
+          <ButtonLayoutEditor services={services} attached={commandForm.attached_services} onUpdate={updated => setCommandForm({ ...commandForm, attached_services: updated })} />
+        </div>
 
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={saveCommand} style={{ ...S.btn("#34d398"), flex: 1 }}>
@@ -604,7 +496,7 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, r
   </div>
 );
 
-const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, reorderQuestions, addQuestionToService, removeQuestionFromService, saveService, setShowServiceModal, S }) => (
+const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, addQuestionToService, removeQuestionFromService, reorderQuestions, saveService, setShowServiceModal, handleFileUpload, fileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -616,36 +508,29 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
 
       <div style={{ padding: "20px" }}>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Service name</label>
-          <input type="text" style={S.input} value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })} placeholder="e.g., 🍕 Uber Eats" />
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Service Name</label>
+          <input type="text" style={S.input} value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })} placeholder="e.g., Support" />
         </div>
 
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Description</label>
-          <input type="text" style={S.input} value={serviceForm.description} onChange={e => setServiceForm({ ...serviceForm, description: e.target.value })} placeholder="Internal description" />
+          <input type="text" style={S.input} value={serviceForm.description} onChange={e => setServiceForm({ ...serviceForm, description: e.target.value })} placeholder="Brief description" />
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Open Message (shown when service picked)</label>
-          <textarea style={{ ...S.input, minHeight: 100 }} value={serviceForm.open_message_content} onChange={e => setServiceForm({ ...serviceForm, open_message_content: e.target.value })} placeholder="Welcome message..." />
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Open Message</label>
+          <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.open_message_content} onChange={e => setServiceForm({ ...serviceForm, open_message_content: e.target.value })} placeholder="Message when service is selected" />
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Closed Message</label>
-          <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.closed_message_content} onChange={e => setServiceForm({ ...serviceForm, closed_message_content: e.target.value })} placeholder="Optional: message when service is closed" />
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Message Image</label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="file" accept="image/*" onChange={e => { if (e.target.files[0]) { handleFileUpload(e.target.files[0], (base64) => { setServiceForm({ ...serviceForm, message_image: base64 }); }); } }} style={{ display: "none" }} id="svc-file-input" key={fileInputKey} />
+            <button onClick={() => document.getElementById("svc-file-input").click()} style={{ ...S.btnOutline, flex: 1, padding: "8px 12px", fontSize: 12 }}>Choose File - {serviceForm.message_image ? "✓ Image selected" : "No file chosen"}</button>
+          </div>
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Queue Full Message</label>
-          <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.queue_full_message_content} onChange={e => setServiceForm({ ...serviceForm, queue_full_message_content: e.target.value })} placeholder="Message when queue is full" />
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Queue Break Message</label>
-          <textarea style={{ ...S.input, minHeight: 80 }} value={serviceForm.queue_break_message_content} onChange={e => setServiceForm({ ...serviceForm, queue_break_message_content: e.target.value })} placeholder="Message when service on break" />
-        </div>
-
-        <div style={{ marginBottom: 20, display: "flex", gap: 16 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
             <input type="checkbox" checked={serviceForm.show_button_new_row} onChange={e => setServiceForm({ ...serviceForm, show_button_new_row: e.target.checked })} />
             Show button on new row
@@ -666,11 +551,11 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
             {(serviceForm.attached_questions || []).length === 0 ? (
               <div style={{ color: "#6060a0", fontSize: 12, padding: "20px", textAlign: "center" }}>No questions attached yet. Add from below.</div>
             ) : (
-              (serviceForm.attached_questions || []).map((qName, idx) => {
-                const q = questions.find(qu => qu.question === qName);
+              (serviceForm.attached_questions || []).map((qId, idx) => {
+                const q = questions.find(qu => qu.id === qId);
                 if (!q) return null;
                 return (
-                  <div key={qName} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', idx); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                  <div key={qId} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', idx); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
                     e.preventDefault();
                     const draggedIdx = parseInt(e.dataTransfer.getData('text/plain'));
                     if (draggedIdx !== idx) {
@@ -678,9 +563,9 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
                     }
                   }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px", background: "#16161f", borderRadius: 6, marginBottom: 6, cursor: "move", border: "1px solid #2a2a3e", fontSize: 12 }}>
                     <span style={{ color: "#60a5fa", userSelect: "none" }}>⋮⋮</span>
-                    <span style={{ color: "#e2e2f0", flex: 1 }}>{idx + 1}. {q.question}</span>
+                    <span style={{ color: "#e2e2f0", flex: 1 }}>{idx + 1}. {q.question || q.question_text}</span>
                     <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
-                    <button onClick={() => removeQuestionFromService(qName)} style={{ background: "none", border: "none", color: "#e05050", cursor: "pointer", fontSize: 14 }}>✕</button>
+                    <button onClick={() => removeQuestionFromService(qId)} style={{ background: "none", border: "none", color: "#e05050", cursor: "pointer", fontSize: 14 }}>✕</button>
                   </div>
                 );
               })
@@ -693,13 +578,16 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
             {questions.length === 0 ? (
               <div style={{ color: "#6060a0", fontSize: 12 }}>No questions created yet</div>
             ) : (
-              questions.map(q => (
-                <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
-                  <button onClick={() => addQuestionToService(q.question)} style={{ background: "none", border: "none", color: "#34d398", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
-                  <span style={{ color: "#e2e2f0", flex: 1 }}>{q.question}</span>
-                  <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
-                </div>
-              ))
+              questions.map(q => {
+                const isAttached = (serviceForm.attached_questions || []).includes(q.id);
+                return (
+                  <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #1e1e2e", fontSize: 12 }}>
+                    <button onClick={() => addQuestionToService(q.id)} disabled={isAttached} style={{ background: "none", border: "none", color: isAttached ? "#6060a0" : "#34d398", cursor: isAttached ? "default" : "pointer", fontSize: 14, padding: 0, opacity: isAttached ? 0.5 : 1 }}>+</button>
+                    <span style={{ color: "#e2e2f0", flex: 1 }}>{q.question || q.question_text}</span>
+                    <span style={{ fontSize: 10, color: "#6060a0" }}>{q.question_type}</span>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -763,6 +651,7 @@ const QuestionModal = ({ editingQuestion, questionForm, setQuestionForm, newOpti
               }}
               style={{ display: "none" }}
               id="q-file-input"
+              key={fileInputKey}
             />
             <button 
               onClick={() => document.getElementById("q-file-input").click()}
