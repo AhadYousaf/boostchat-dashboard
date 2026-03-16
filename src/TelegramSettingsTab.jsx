@@ -6,12 +6,10 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Main data from API
   const [services, setServices] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [commands, setCommands] = useState([]);
 
-  // Modal states
   const [showCommandModal, setShowCommandModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -20,7 +18,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(0);
 
-  // Command form
   const [commandForm, setCommandForm] = useState({
     cmd: "",
     desc: "",
@@ -29,7 +26,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     attached_services: []
   });
 
-  // Service form
   const [serviceForm, setServiceForm] = useState({
     name: "",
     description: "",
@@ -42,7 +38,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     attached_questions: []
   });
 
-  // Question form
   const [questionForm, setQuestionForm] = useState({
     question_text: "",
     message_content: "",
@@ -53,7 +48,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
   const [newOption, setNewOption] = useState("");
 
-  // Load settings on mount
   useEffect(() => {
     loadSettings();
   }, [node.id]);
@@ -106,7 +100,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         }))
       };
       
-      const response = await api(`/nodes/${node.id}/settings`, {
+      await api(`/nodes/${node.id}/settings`, {
         method: "PUT",
         body: payload
       });
@@ -120,7 +114,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
     }
   };
 
-  // File upload handler
   const handleFileUpload = (file, callback) => {
     if (!file) return;
     const reader = new FileReader();
@@ -175,6 +168,23 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
   const deleteCommand = (cmd) => {
     setCommands(commands.filter(c => (c.id || c.command) !== (cmd.id || cmd.command)));
+  };
+
+  const reorderButtonLayout = (fromIdx, toIdx) => {
+    const updated = [...commandForm.attached_services];
+    const [removed] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, removed);
+    setCommandForm({ ...commandForm, attached_services: updated });
+  };
+
+  const addButtonToLayout = (serviceName) => {
+    if (!commandForm.attached_services.includes(serviceName)) {
+      setCommandForm({ ...commandForm, attached_services: [...commandForm.attached_services, serviceName] });
+    }
+  };
+
+  const removeButtonFromLayout = (idx) => {
+    setCommandForm({ ...commandForm, attached_services: commandForm.attached_services.filter((_, i) => i !== idx) });
   };
 
   // =============== SERVICES ===============
@@ -315,7 +325,6 @@ const TelegramSettingsTab = ({ node, api, S }) => {
 
   const deleteQuestion = (questionId) => {
     setQuestions(questions.filter(q => q.id !== questionId));
-    // Remove from all services
     setServices(services.map(s => ({
       ...s,
       attached_questions: (s.attached_questions || []).filter(id => id !== questionId)
@@ -350,7 +359,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         <p style={{ margin: 0, fontSize: 13, color: "#8888b0" }}>Configure commands, services, and questions for your Telegram bot</p>
       </div>
 
-      {/* COMMANDS TAB */}
+      {/* COMMANDS */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#e2e2f0" }}>Commands</h3>
@@ -360,7 +369,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           {commands.length === 0 ? (
             <div style={{ color: "#6060a0", fontSize: 13, padding: "20px", background: "#0d0d12", borderRadius: 8, textAlign: "center" }}>No commands created yet</div>
           ) : (
-            commands.map((cmd, idx) => (
+            commands.map((cmd) => (
               <div key={cmd.id || cmd.command} style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: "#e2e2f0", fontWeight: 600, fontSize: 13 }}>{cmd.cmd || cmd.command}</div>
@@ -376,7 +385,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         </div>
       </div>
 
-      {/* SERVICES TAB */}
+      {/* SERVICES */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#e2e2f0" }}>Services</h3>
@@ -386,7 +395,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           {services.length === 0 ? (
             <div style={{ color: "#6060a0", fontSize: 13, padding: "20px", background: "#0d0d12", borderRadius: 8, textAlign: "center" }}>No services created yet</div>
           ) : (
-            services.map((svc, idx) => (
+            services.map((svc) => (
               <div key={svc.id} style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: "#e2e2f0", fontWeight: 600, fontSize: 13 }}>{svc.name}</div>
@@ -403,7 +412,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
         </div>
       </div>
 
-      {/* QUESTIONS TAB */}
+      {/* QUESTIONS */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#e2e2f0" }}>Questions</h3>
@@ -413,7 +422,7 @@ const TelegramSettingsTab = ({ node, api, S }) => {
           {questions.length === 0 ? (
             <div style={{ color: "#6060a0", fontSize: 13, padding: "20px", background: "#0d0d12", borderRadius: 8, textAlign: "center" }}>No questions created yet</div>
           ) : (
-            questions.map((q, idx) => (
+            questions.map((q) => (
               <div key={q.id} style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: "#e2e2f0", fontWeight: 600, fontSize: 13 }}>{q.question || q.question_text}</div>
@@ -437,14 +446,14 @@ const TelegramSettingsTab = ({ node, api, S }) => {
       </div>
 
       {/* MODALS */}
-      {showCommandModal && <CommandModal editingCommand={editingCommand} commandForm={commandForm} setCommandForm={setCommandForm} services={services} saveCommand={saveCommand} setShowCommandModal={setShowCommandModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
+      {showCommandModal && <CommandModal editingCommand={editingCommand} commandForm={commandForm} setCommandForm={setCommandForm} services={services} reorderButtonLayout={reorderButtonLayout} addButtonToLayout={addButtonToLayout} removeButtonFromLayout={removeButtonFromLayout} saveCommand={saveCommand} setShowCommandModal={setShowCommandModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
       {showServiceModal && <ServiceModal editingService={editingService} serviceForm={serviceForm} setServiceForm={setServiceForm} questions={questions} addQuestionToService={addQuestionToService} removeQuestionFromService={removeQuestionFromService} reorderQuestions={reorderQuestions} saveService={saveService} setShowServiceModal={setShowServiceModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
       {showQuestionModal && <QuestionModal editingQuestion={editingQuestion} questionForm={questionForm} setQuestionForm={setQuestionForm} newOption={newOption} setNewOption={setNewOption} addQuestionOption={addQuestionOption} removeQuestionOption={removeQuestionOption} saveQuestion={saveQuestion} setShowQuestionModal={setShowQuestionModal} handleFileUpload={handleFileUpload} fileInputKey={fileInputKey} S={S} />}
     </div>
   );
 };
 
-const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
+const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, reorderButtonLayout, addButtonToLayout, removeButtonFromLayout, saveCommand, setShowCommandModal, handleFileUpload, fileInputKey, S }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, overflowY: "auto" }}>
     <div style={{ ...S.card, width: "90%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "20px auto" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#16161f", zIndex: 10 }}>
@@ -481,8 +490,8 @@ const CommandModal = ({ editingCommand, commandForm, setCommandForm, services, s
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Services/Buttons Layout</label>
-          <ButtonLayoutEditor services={services} attached={commandForm.attached_services} onUpdate={updated => setCommandForm({ ...commandForm, attached_services: updated })} />
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Services/Buttons Layout</label>
+          <ButtonLayoutEditor services={services} attachedServices={commandForm.attached_services} onReorder={reorderButtonLayout} onAdd={addButtonToLayout} onRemove={removeButtonFromLayout} S={S} />
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
@@ -523,14 +532,6 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Message Image</label>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="file" accept="image/*" onChange={e => { if (e.target.files[0]) { handleFileUpload(e.target.files[0], (base64) => { setServiceForm({ ...serviceForm, message_image: base64 }); }); } }} style={{ display: "none" }} id="svc-file-input" key={fileInputKey} />
-            <button onClick={() => document.getElementById("svc-file-input").click()} style={{ ...S.btnOutline, flex: 1, padding: "8px 12px", fontSize: 12 }}>Choose File - {serviceForm.message_image ? "✓ Image selected" : "No file chosen"}</button>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
             <input type="checkbox" checked={serviceForm.show_button_new_row} onChange={e => setServiceForm({ ...serviceForm, show_button_new_row: e.target.checked })} />
             Show button on new row
@@ -541,12 +542,11 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
           </label>
         </div>
 
-        {/* QUESTIONS - DRAG TO REORDER */}
+        {/* QUESTIONS */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 8, fontWeight: 700 }}>Questions (in order)</label>
           <p style={{ fontSize: 11, color: "#6060a0", marginBottom: 8 }}>Drag to reorder. Click X to remove.</p>
           
-          {/* Attached Questions List */}
           <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, marginBottom: 12, minHeight: 60 }}>
             {(serviceForm.attached_questions || []).length === 0 ? (
               <div style={{ color: "#6060a0", fontSize: 12, padding: "20px", textAlign: "center" }}>No questions attached yet. Add from below.</div>
@@ -572,7 +572,6 @@ const ServiceModal = ({ editingService, serviceForm, setServiceForm, questions, 
             )}
           </div>
 
-          {/* Available Questions to Add */}
           <label style={{ fontSize: 11, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Available questions:</label>
           <div style={{ background: "#0d0d12", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, maxHeight: 150, overflowY: "auto" }}>
             {questions.length === 0 ? (
