@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 const RevoltSettingsTab = ({ node, api, S }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fetchingCategories, setFetchingCategories] = useState(false);
   const [error, setError] = useState("");
   const [revoltGuildId, setRevoltGuildId] = useState("");
   const [services, setServices] = useState([]);
@@ -75,6 +76,29 @@ const RevoltSettingsTab = ({ node, api, S }) => {
     }
   };
 
+  const fetchCategories = async () => {
+    if (!revoltGuildId) {
+      setError("Guild ID is required");
+      return;
+    }
+
+    setFetchingCategories(true);
+    setError("");
+    try {
+      // This will be called by revolt-bridge.js later
+      // For now, we'll just show a placeholder
+      setCategories([
+        { id: "cat_1", name: "Open Tickets" },
+        { id: "cat_2", name: "Claimed Tickets" },
+        { id: "cat_3", name: "Closed Tickets" }
+      ]);
+    } catch (err) {
+      setError("Failed to fetch categories. Make sure Guild ID is correct.");
+    } finally {
+      setFetchingCategories(false);
+    }
+  };
+
   const saveSettings = async () => {
     if (!revoltGuildId) {
       setError("Guild ID is required");
@@ -140,18 +164,25 @@ const RevoltSettingsTab = ({ node, api, S }) => {
           <span style={{ fontWeight: 700, fontSize: 13 }}>Revolt Server Configuration</span>
         </div>
         <div style={{ padding: "20px" }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Guild ID</label>
-          <input
-            style={S.input}
-            value={revoltGuildId}
-            onChange={e => setRevoltGuildId(e.target.value)}
-            placeholder="Enter your Revolt server/guild ID..."
-          />
-          <div style={{ fontSize: 11, color: "#4040a0", marginTop: 4 }}>⊙ Your bot will fetch categories from this server</div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Guild ID</label>
+            <input
+              style={S.input}
+              value={revoltGuildId}
+              onChange={e => setRevoltGuildId(e.target.value)}
+              placeholder="Enter your Revolt server/guild ID..."
+            />
+          </div>
+          <button 
+            onClick={fetchCategories} 
+            disabled={fetchingCategories || !revoltGuildId}
+            style={{ ...S.btn("#60a5fa"), fontSize: 12, padding: "8px 16px" }}>
+            {fetchingCategories ? "Loading..." : "Load Categories"}
+          </button>
         </div>
       </div>
 
-      {/* Service Settings - Collapsible */}
+      {/* Service Settings */}
       {services.length === 0 ? (
         <div style={{ ...S.card, padding: 20, textAlign: "center", color: "#6060a0" }}>
           No services created yet. Create services in Telegram tab first.
@@ -171,32 +202,44 @@ const RevoltSettingsTab = ({ node, api, S }) => {
                 
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Open category</label>
-                  <input
+                  <select
                     style={S.input}
-                    placeholder="Enter category name"
                     value={serviceCategories[service.id]?.open || ""}
                     onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], open: e.target.value } })}
-                  />
+                  >
+                    <option value="">Select category...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claimed category</label>
-                  <input
+                  <select
                     style={S.input}
-                    placeholder="Enter category name"
                     value={serviceCategories[service.id]?.claimed || ""}
                     onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], claimed: e.target.value } })}
-                  />
+                  >
+                    <option value="">Select category...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Closed category</label>
-                  <input
+                  <select
                     style={S.input}
-                    placeholder="Enter category name"
                     value={serviceCategories[service.id]?.closed || ""}
                     onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], closed: e.target.value } })}
-                  />
+                  >
+                    <option value="">Select category...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
