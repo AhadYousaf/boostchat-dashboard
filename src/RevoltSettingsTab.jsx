@@ -86,13 +86,10 @@ const RevoltSettingsTab = ({ node, api, S }) => {
     setFetchingCategories(true);
     setError("");
     try {
-      setCategories([
-        { id: "cat_1", name: "Open Tickets" },
-        { id: "cat_2", name: "Claimed Tickets" },
-        { id: "cat_3", name: "Closed Tickets" }
-      ]);
+      const data = await api(`/nodes/${node.id}/revolt-categories?guild_id=${revoltGuildId}`);
+      setCategories(data.categories || []);
     } catch (err) {
-      setError("Failed to fetch categories. Make sure Guild ID is correct.");
+      setError(err.message || "Failed to fetch categories");
     } finally {
       setFetchingCategories(false);
     }
