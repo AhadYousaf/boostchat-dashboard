@@ -9,7 +9,18 @@ const RevoltSettingsTab = ({ node, api, S }) => {
   const [revoltBotToken, setRevoltBotToken] = useState("");
   const [revoltGuildId, setRevoltGuildId] = useState("");
   const [services, setServices] = useState([]);
-  const [revoltChannels, setRevoltChannels] = useState({});
+  
+  // Category settings per service
+  const [categories, setCategories] = useState({});
+  
+  // Ticket naming per service
+  const [ticketNaming, setTicketNaming] = useState({});
+  
+  // Enforced claiming per service
+  const [enforcedClaiming, setEnforcedClaiming] = useState({});
+  
+  // Service status per service
+  const [serviceStatus, setServiceStatus] = useState({});
 
   // Load settings on mount
   useEffect(() => {
@@ -22,22 +33,45 @@ const RevoltSettingsTab = ({ node, api, S }) => {
     try {
       const data = await api(`/nodes/${node.id}/settings`);
       
-      // Load services
       setServices(data.services || []);
       
-      // Load revolt config from node_config
       const config = data.config || {};
       setRevoltBotToken(config.revolt_bot_token || "");
       setRevoltGuildId(config.revolt_guild_id || "");
       
-      // Load channel IDs from services
-      const channels = {};
+      // Load service-specific settings
+      const cats = {};
+      const naming = {};
+      const claiming = {};
+      const status = {};
+      
       (data.services || []).forEach(service => {
-        if (service.revolt_channel_id) {
-          channels[service.id] = service.revolt_channel_id;
-        }
+        cats[service.id] = {
+          open: service.open_category || "",
+          claimed: service.claimed_category || "",
+          closed: service.closed_category || ""
+        };
+        naming[service.id] = {
+          opened: service.ticket_opened_format || "ticket-{count}",
+          claimed: service.ticket_claimed_format || "claimed-{nickname}-{count}",
+          closed: service.ticket_closed_format || "closed-{count}"
+        };
+        claiming[service.id] = {
+          enabled: service.enforced_claiming_enabled || false,
+          maxTickets: service.max_claims_per_contractor || 0,
+          timeout: service.claim_timeout_seconds || 0
+        };
+        status[service.id] = {
+          isOpen: service.is_service_open !== false,
+          isQueueFull: service.is_queue_full || false,
+          isQueueOnBreak: service.is_queue_on_break || false
+        };
       });
-      setRevoltChannels(channels);
+      
+      setCategories(cats);
+      setTicketNaming(naming);
+      setEnforcedClaiming(claiming);
+      setServiceStatus(status);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -49,10 +83,20 @@ const RevoltSettingsTab = ({ node, api, S }) => {
     setSaving(true);
     setError("");
     try {
-      // Update services with channel IDs
       const updatedServices = services.map(s => ({
         ...s,
-        revolt_channel_id: revoltChannels[s.id] || ""
+        open_category: categories[s.id]?.open || "",
+        claimed_category: categories[s.id]?.claimed || "",
+        closed_category: categories[s.id]?.closed || "",
+        ticket_opened_format: ticketNaming[s.id]?.opened || "ticket-{count}",
+        ticket_claimed_format: ticketNaming[s.id]?.claimed || "claimed-{nickname}-{count}",
+        ticket_closed_format: ticketNaming[s.id]?.closed || "closed-{count}",
+        enforced_claiming_enabled: enforcedClaiming[s.id]?.enabled || false,
+        max_claims_per_contractor: enforcedClaiming[s.id]?.maxTickets || 0,
+        claim_timeout_seconds: enforcedClaiming[s.id]?.timeout || 0,
+        is_service_open: serviceStatus[s.id]?.isOpen !== false,
+        is_queue_full: serviceStatus[s.id]?.isQueueFull || false,
+        is_queue_on_break: serviceStatus[s.id]?.isQueueOnBreak || false
       }));
 
       const payload = {
@@ -89,134 +133,213 @@ const RevoltSettingsTab = ({ node, api, S }) => {
         </div>
       )}
 
-      {/* Bot Customization Section */}
-      <div style={{ ...S.card, marginBottom: 16 }}>
+      {/* Bot Customization */}
+      <div style={{ ...S.card, marginBottom: 20 }}>
         <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#f87171" }}>⚡</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>BoostChat Settings</span>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>Bot customization</span>
         </div>
         <div style={{ padding: "20px" }}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>BoostChat bot customisation</h3>
-          <p style={{ fontSize: 13, color: "#6060a0", marginBottom: 20, lineHeight: 1.7 }}>
-            Configure your BoostChat bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your team delivers the best possible service.
-          </p>
-
-          {/* Bot Customization */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Bot customization</div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Bot Token</label>
-              <input
-                type="password"
-                style={S.input}
-                value={revoltBotToken}
-                onChange={e => setRevoltBotToken(e.target.value)}
-                placeholder="Enter your Revolt bot token..."
-              />
-              <div style={{ fontSize: 11, color: "#4040a0", marginTop: 4 }}>⊙ Get your bot token from Revolt Developer Portal</div>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Guild ID</label>
-              <input
-                style={S.input}
-                value={revoltGuildId}
-                onChange={e => setRevoltGuildId(e.target.value)}
-                placeholder="Enter your Revolt server/guild ID..."
-              />
-              <div style={{ fontSize: 11, color: "#4040a0", marginTop: 4 }}>⊙ This is where your bot will create and manage tickets</div>
-            </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Bot Token</label>
+            <input
+              type="password"
+              style={S.input}
+              value={revoltBotToken}
+              onChange={e => setRevoltBotToken(e.target.value)}
+              placeholder="Enter your Revolt bot token..."
+            />
           </div>
 
-          {/* Service Ticket Management */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Service ticket management</div>
-            <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
-              To effectively manage customer inquiries and responses, assign a Revolt channel where tickets for each service will be created.
-            </div>
-
-            {services.length === 0 ? (
-              <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: 16, color: "#6060a0", fontSize: 12, textAlign: "center" }}>
-                No services created yet. Create services in the Telegram tab first.
-              </div>
-            ) : (
-              <div>
-                {services.map(service => (
-                  <div key={service.id} style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e2f0" }}>{service.name}</div>
-                        <div style={{ fontSize: 11, color: "#6060a0", marginTop: 4 }}>
-                          {revoltChannels[service.id] ? `Channel: ${revoltChannels[service.id]}` : "No channel assigned"}
-                        </div>
-                      </div>
-                      <input
-                        style={{ ...S.input, width: 200, fontSize: 12 }}
-                        placeholder="Channel ID"
-                        value={revoltChannels[service.id] || ""}
-                        onChange={e => setRevoltChannels({ ...revoltChannels, [service.id]: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Command Permissions */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Command permissions</div>
-            <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "10px 0" }}>
-                <span style={{ color: "#60a5fa", marginRight: 12 }}>⊙</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#60a5fa" }}>Default</div>
-                  <div style={{ fontSize: 12, color: "#6060a0", marginTop: 2 }}>Change the permissions and availability of default commands. Default commands are the basics to the ticket tool system.</div>
-                </div>
-                <button style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>···</button>
-              </div>
-            </div>
-
-            <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "10px 0" }}>
-                <span style={{ color: "#f59e0b", marginRight: 12 }}>🔧</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Utility</div>
-                  <div style={{ fontSize: 12, color: "#6060a0", marginTop: 2 }}>Change the permissions and availability of utility commands. Utility are more sensitive commands that help with other functionality on the bot.</div>
-                </div>
-                <button style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>···</button>
-              </div>
-            </div>
-
-            <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "10px 0" }}>
-                <span style={{ color: "#34d398", marginRight: 12 }}>💰</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#34d398" }}>Accounting</div>
-                  <div style={{ fontSize: 12, color: "#6060a0", marginTop: 2 }}>Change the permissions and availability of accounting addon commands. The accounting addon helps you manage your business better.</div>
-                </div>
-                <button style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>···</button>
-              </div>
-            </div>
-          </div>
-
-          {/* Miscellaneous Customization */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Miscellaneous customization</div>
-            <div style={{ background: "#1a1a28", border: "1px solid #2a2a3e", borderRadius: 8, padding: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "10px 0" }}>
-                <span style={{ color: "#f87171", marginRight: 12 }}>✦</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#f87171" }}>Bot message passthrough</div>
-                  <div style={{ fontSize: 12, color: "#6060a0", marginTop: 2 }}>Want a bot's message to passthrough to your customers? This can result in errors unless you know what you're doing.</div>
-                </div>
-                <button style={{ ...S.btnOutline, fontSize: 11, padding: "4px 10px" }}>···</button>
-              </div>
-            </div>
+          <div>
+            <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Guild ID</label>
+            <input
+              style={S.input}
+              value={revoltGuildId}
+              onChange={e => setRevoltGuildId(e.target.value)}
+              placeholder="Enter your Revolt server/guild ID..."
+            />
           </div>
         </div>
       </div>
+
+      {/* Service Settings */}
+      {services.length === 0 ? (
+        <div style={{ ...S.card, padding: 20, textAlign: "center", color: "#6060a0" }}>
+          No services created yet. Create services in Telegram tab first.
+        </div>
+      ) : (
+        services.map(service => (
+          <div key={service.id} style={{ ...S.card, marginBottom: 20 }}>
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
+              <span>📋</span>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{service.name}</span>
+            </div>
+            
+            <div style={{ padding: "20px" }}>
+              {/* Category Settings */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Category settings</div>
+                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>Choose where the tickets for this service become created.</div>
+                
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Open category</label>
+                  <input
+                    style={S.input}
+                    placeholder="Category name (e.g., open-tickets)"
+                    value={categories[service.id]?.open || ""}
+                    onChange={e => setCategories({ ...categories, [service.id]: { ...categories[service.id], open: e.target.value } })}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claimed category</label>
+                  <input
+                    style={S.input}
+                    placeholder="Category name (e.g., claimed-tickets)"
+                    value={categories[service.id]?.claimed || ""}
+                    onChange={e => setCategories({ ...categories, [service.id]: { ...categories[service.id], claimed: e.target.value } })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Closed category</label>
+                  <input
+                    style={S.input}
+                    placeholder="Category name (e.g., closed-tickets)"
+                    value={categories[service.id]?.closed || ""}
+                    onChange={e => setCategories({ ...categories, [service.id]: { ...categories[service.id], closed: e.target.value } })}
+                  />
+                </div>
+              </div>
+
+              {/* Ticket Naming */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Ticket naming</div>
+                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
+                  Choose what you would like to name your tickets. Options: {"{nickname}"} = contractor nickname/discord name, {"{count}"} = ticket number
+                </div>
+                
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Ticket opened format</label>
+                  <input
+                    style={S.input}
+                    placeholder="e.g., ticket-{count}"
+                    value={ticketNaming[service.id]?.opened || ""}
+                    onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], opened: e.target.value } })}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Ticket claimed format</label>
+                  <input
+                    style={S.input}
+                    placeholder="e.g., claimed-{nickname}-{count}"
+                    value={ticketNaming[service.id]?.claimed || ""}
+                    onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], claimed: e.target.value } })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Ticket closed format</label>
+                  <input
+                    style={S.input}
+                    placeholder="e.g., closed-{count}"
+                    value={ticketNaming[service.id]?.closed || ""}
+                    onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], closed: e.target.value } })}
+                  />
+                </div>
+              </div>
+
+              {/* Enforced Claiming */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Enforced claiming</div>
+                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
+                  Tired of workers using bots to claim tickets and message customers first—or claiming tickets and then failing to respond? Mitigate these issues by enabling claim caps, limiting the number of tickets a worker can hold at once, and automatically timing out unclaimed claims.
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={enforcedClaiming[service.id]?.enabled || false}
+                      onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], enabled: e.target.checked } })}
+                      style={{ marginRight: 8 }}
+                    />
+                    Enforced claiming enabled?
+                  </label>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>How many tickets can a contractor claim at once?</label>
+                  <input
+                    type="number"
+                    style={S.input}
+                    value={enforcedClaiming[service.id]?.maxTickets || 0}
+                    onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], maxTickets: parseInt(e.target.value) || 0 } })}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claim timeout (seconds) until no worker response after claiming</label>
+                  <input
+                    type="number"
+                    style={S.input}
+                    value={enforcedClaiming[service.id]?.timeout || 0}
+                    onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], timeout: parseInt(e.target.value) || 0 } })}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* Service Status */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Service status related</div>
+                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
+                  Change status settings that relate to the actual service. These can be changed by the /service {`{status/open}`} command on discord.
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={serviceStatus[service.id]?.isOpen !== false}
+                      onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isOpen: e.target.checked } })}
+                      style={{ marginRight: 8 }}
+                    />
+                    Is the service open?
+                  </label>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={serviceStatus[service.id]?.isQueueFull || false}
+                      onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isQueueFull: e.target.checked } })}
+                      style={{ marginRight: 8 }}
+                    />
+                    Is the queue full?
+                  </label>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={serviceStatus[service.id]?.isQueueOnBreak || false}
+                      onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isQueueOnBreak: e.target.checked } })}
+                      style={{ marginRight: 8 }}
+                    />
+                    Is the queue paused for a break?
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
 
       {/* Save Button */}
       <div style={{ display: "flex", gap: 8 }}>
