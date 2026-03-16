@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import TelegramSettingsTab from "./TelegramSettingsTab";
+import RevoltSettingsTab from "./RevoltSettingsTab";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API = "https://onechat-backend-production.up.railway.app/api";
@@ -758,42 +759,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
 
           {/* ── BOOSTCHAT ── */}
           {tab==="BoostChat" && (
-            <div>
-              <SectionCard icon="⚡" title="BoostChat Settings" color="#f87171">
-                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>BoostChat bot customisation</h3>
-                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
-                  Configure your BoostChat bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your team delivers the best possible service.
-                </p>
-
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Bot customization</div>
-                  <SettingRow icon="🏷" title="Guild ID" desc="Change the BoostChat guild/server that we will listen to. This is where commands, messages, tickets and other data will be created." color="#a78bfa"/>
-                </div>
-
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Service ticket management</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To effectively manage customer inquiries and responses, a ticket must be created every time a customer provides an answer. You need to designate a space where tickets will be generated.</div>
-                  {["5Guys","Uber Eats $50+","Chipotle","Door Dash 45% OFF","Dominos","Wing Stop","Panera"].map((s,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:13 }}>{s}</span>
-                      <button style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>···</button>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Command permissions</div>
-                  <SettingRow icon="⊙" title="Default" desc="Change the permissions and availability of default commands. Default commands are the basics to the ticket tool system." color="#60a5fa"/>
-                  <SettingRow icon="🔧" title="Utility" desc="Change the permissions and availability of utility commands. Utility are more sensitive commands that help with other functionality on the bot." color="#f59e0b"/>
-                  <SettingRow icon="💰" title="Accounting" desc="Change the permissions and availability of accounting addon commands." color="#34d398"/>
-                </div>
-
-                <div>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
-                  <SettingRow icon="✦" title="Bot message passthrough" desc="Want a bots message to passthrough to your customers? This can result in errors unless you know what you're doing." color="#f87171"/>
-                </div>
-              </SectionCard>
-            </div>
+            <RevoltSettingsTab node={node} api={api} S={S} />
           )}
 
           {/* ── WEBAPP ── */}
