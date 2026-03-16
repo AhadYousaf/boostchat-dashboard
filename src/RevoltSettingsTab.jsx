@@ -8,6 +8,7 @@ const RevoltSettingsTab = ({ node, api, S }) => {
   const [revoltGuildId, setRevoltGuildId] = useState("");
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [expandedService, setExpandedService] = useState(null);
   
   // Category selection per service
   const [serviceCategories, setServiceCategories] = useState({});
@@ -85,8 +86,6 @@ const RevoltSettingsTab = ({ node, api, S }) => {
     setFetchingCategories(true);
     setError("");
     try {
-      // This will be called by revolt-bridge.js later
-      // For now, we'll just show a placeholder
       setCategories([
         { id: "cat_1", name: "Open Tickets" },
         { id: "cat_2", name: "Claimed Tickets" },
@@ -182,183 +181,199 @@ const RevoltSettingsTab = ({ node, api, S }) => {
         </div>
       </div>
 
-      {/* Service Settings */}
+      {/* Service Settings - Collapsible */}
       {services.length === 0 ? (
         <div style={{ ...S.card, padding: 20, textAlign: "center", color: "#6060a0" }}>
           No services created yet. Create services in Telegram tab first.
         </div>
       ) : (
-        services.map(service => (
-          <div key={service.id} style={{ ...S.card, marginBottom: 20 }}>
-            <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
-              <span>📋</span>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{service.name}</span>
+        <div>
+          {services.map(service => (
+            <div key={service.id} style={{ ...S.card, marginBottom: 12 }}>
+              {/* Collapsible Header */}
+              <div 
+                onClick={() => setExpandedService(expandedService === service.id ? null : service.id)}
+                style={{ 
+                  padding: "12px 20px", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 12,
+                  cursor: "pointer",
+                  borderBottom: expandedService === service.id ? "1px solid #1e1e2e" : "none"
+                }}
+              >
+                <span style={{ fontSize: 16 }}>{expandedService === service.id ? "▼" : "▶"}</span>
+                <span style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>{service.name}</span>
+              </div>
+
+              {/* Expanded Content */}
+              {expandedService === service.id && (
+                <div style={{ padding: "20px" }}>
+                  {/* Category Selection */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Category settings</div>
+                    
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Open category</label>
+                      <select
+                        style={S.input}
+                        value={serviceCategories[service.id]?.open || ""}
+                        onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], open: e.target.value } })}
+                      >
+                        <option value="">Select category...</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claimed category</label>
+                      <select
+                        style={S.input}
+                        value={serviceCategories[service.id]?.claimed || ""}
+                        onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], claimed: e.target.value } })}
+                      >
+                        <option value="">Select category...</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Closed category</label>
+                      <select
+                        style={S.input}
+                        value={serviceCategories[service.id]?.closed || ""}
+                        onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], closed: e.target.value } })}
+                      >
+                        <option value="">Select category...</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Ticket Naming */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Ticket naming</div>
+                    <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
+                      Options: {"{nickname}"} = contractor name, {"{count}"} = ticket number
+                    </div>
+                    
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Opened</label>
+                      <input
+                        style={S.input}
+                        placeholder="ticket-{count}"
+                        value={ticketNaming[service.id]?.opened || ""}
+                        onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], opened: e.target.value } })}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claimed</label>
+                      <input
+                        style={S.input}
+                        placeholder="claimed-{nickname}-{count}"
+                        value={ticketNaming[service.id]?.claimed || ""}
+                        onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], claimed: e.target.value } })}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Closed</label>
+                      <input
+                        style={S.input}
+                        placeholder="closed-{count}"
+                        value={ticketNaming[service.id]?.closed || ""}
+                        onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], closed: e.target.value } })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Enforced Claiming */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Enforced claiming</div>
+
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={enforcedClaiming[service.id]?.enabled || false}
+                          onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], enabled: e.target.checked } })}
+                          style={{ marginRight: 8 }}
+                        />
+                        Enabled?
+                      </label>
+                    </div>
+
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Max tickets per contractor</label>
+                      <input
+                        type="number"
+                        style={S.input}
+                        value={enforcedClaiming[service.id]?.maxTickets || 0}
+                        onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], maxTickets: parseInt(e.target.value) || 0 } })}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Timeout (seconds)</label>
+                      <input
+                        type="number"
+                        style={S.input}
+                        value={enforcedClaiming[service.id]?.timeout || 0}
+                        onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], timeout: parseInt(e.target.value) || 0 } })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Service Status */}
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Service status</div>
+
+                    <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
+                      <input
+                        type="checkbox"
+                        checked={serviceStatus[service.id]?.isOpen !== false}
+                        onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isOpen: e.target.checked } })}
+                        style={{ marginRight: 8 }}
+                      />
+                      Service open?
+                    </label>
+
+                    <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
+                      <input
+                        type="checkbox"
+                        checked={serviceStatus[service.id]?.isQueueFull || false}
+                        onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isQueueFull: e.target.checked } })}
+                        style={{ marginRight: 8 }}
+                      />
+                      Queue full?
+                    </label>
+
+                    <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, display: "block" }}>
+                      <input
+                        type="checkbox"
+                        checked={serviceStatus[service.id]?.isQueueOnBreak || false}
+                        onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isQueueOnBreak: e.target.checked } })}
+                        style={{ marginRight: 8 }}
+                      />
+                      Queue on break?
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <div style={{ padding: "20px" }}>
-              {/* Category Selection */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Category settings</div>
-                
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Open category</label>
-                  <select
-                    style={S.input}
-                    value={serviceCategories[service.id]?.open || ""}
-                    onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], open: e.target.value } })}
-                  >
-                    <option value="">Select category...</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claimed category</label>
-                  <select
-                    style={S.input}
-                    value={serviceCategories[service.id]?.claimed || ""}
-                    onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], claimed: e.target.value } })}
-                  >
-                    <option value="">Select category...</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Closed category</label>
-                  <select
-                    style={S.input}
-                    value={serviceCategories[service.id]?.closed || ""}
-                    onChange={e => setServiceCategories({ ...serviceCategories, [service.id]: { ...serviceCategories[service.id], closed: e.target.value } })}
-                  >
-                    <option value="">Select category...</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Ticket Naming */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Ticket naming</div>
-                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
-                  Options: {"{nickname}"} = contractor name, {"{count}"} = ticket number
-                </div>
-                
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Opened</label>
-                  <input
-                    style={S.input}
-                    placeholder="ticket-{count}"
-                    value={ticketNaming[service.id]?.opened || ""}
-                    onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], opened: e.target.value } })}
-                  />
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Claimed</label>
-                  <input
-                    style={S.input}
-                    placeholder="claimed-{nickname}-{count}"
-                    value={ticketNaming[service.id]?.claimed || ""}
-                    onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], claimed: e.target.value } })}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Closed</label>
-                  <input
-                    style={S.input}
-                    placeholder="closed-{count}"
-                    value={ticketNaming[service.id]?.closed || ""}
-                    onChange={e => setTicketNaming({ ...ticketNaming, [service.id]: { ...ticketNaming[service.id], closed: e.target.value } })}
-                  />
-                </div>
-              </div>
-
-              {/* Enforced Claiming */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Enforced claiming</div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600 }}>
-                    <input
-                      type="checkbox"
-                      checked={enforcedClaiming[service.id]?.enabled || false}
-                      onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], enabled: e.target.checked } })}
-                      style={{ marginRight: 8 }}
-                    />
-                    Enabled?
-                  </label>
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Max tickets per contractor</label>
-                  <input
-                    type="number"
-                    style={S.input}
-                    value={enforcedClaiming[service.id]?.maxTickets || 0}
-                    onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], maxTickets: parseInt(e.target.value) || 0 } })}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>Timeout (seconds)</label>
-                  <input
-                    type="number"
-                    style={S.input}
-                    value={enforcedClaiming[service.id]?.timeout || 0}
-                    onChange={e => setEnforcedClaiming({ ...enforcedClaiming, [service.id]: { ...enforcedClaiming[service.id], timeout: parseInt(e.target.value) || 0 } })}
-                  />
-                </div>
-              </div>
-
-              {/* Service Status */}
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Service status</div>
-
-                <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
-                  <input
-                    type="checkbox"
-                    checked={serviceStatus[service.id]?.isOpen !== false}
-                    onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isOpen: e.target.checked } })}
-                    style={{ marginRight: 8 }}
-                  />
-                  Service open?
-                </label>
-
-                <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
-                  <input
-                    type="checkbox"
-                    checked={serviceStatus[service.id]?.isQueueFull || false}
-                    onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isQueueFull: e.target.checked } })}
-                    style={{ marginRight: 8 }}
-                  />
-                  Queue full?
-                </label>
-
-                <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, display: "block" }}>
-                  <input
-                    type="checkbox"
-                    checked={serviceStatus[service.id]?.isQueueOnBreak || false}
-                    onChange={e => setServiceStatus({ ...serviceStatus, [service.id]: { ...serviceStatus[service.id], isQueueOnBreak: e.target.checked } })}
-                    style={{ marginRight: 8 }}
-                  />
-                  Queue on break?
-                </label>
-              </div>
-            </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
 
       {/* Save Button */}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
         <button 
           onClick={saveSettings} 
           disabled={saving} 
