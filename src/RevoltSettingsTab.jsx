@@ -121,8 +121,6 @@ const RevoltSettingsTab = ({ node, api, S }) => {
         method: "PUT",
         body: {
           services: updatedServices,
-          questions: [],
-          commands: [],
           revolt_guild_id: revoltGuildId
         }
       });
