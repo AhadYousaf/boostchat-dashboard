@@ -1056,8 +1056,7 @@ const TicketDetailPanel = ({ ticket, onClose }) => {
     try {
       const conversation = detail.messages.map(m =>
         `${m.sender_name || m.sender_type}: ${m.content || '[media]'}`
-      ).join('
-');
+      ).join('\n');
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
