@@ -722,8 +722,8 @@ const TelegramSettingsTab = ({ node }) => {
                     style={{ ...S.input, minHeight:60, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="Message shown when customer uses this command..."/>
                   {c.cmd === '/start' && (
                     <>
-                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached services (shown as buttons)</div>
-                      <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:8, fontWeight:600 }}>Attached services — click to toggle, drag to reorder (2 per row in bot)</div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
                         {services.map(s => (
                           <button key={s.id||s.name} onClick={() => toggleServiceOnCommand(c.id||c.cmd, s.name)}
                             style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
@@ -731,11 +731,45 @@ const TelegramSettingsTab = ({ node }) => {
                               background:(c.attached_services||[]).includes(s.name)?"#60a5fa22":"transparent",
                               color:(c.attached_services||[]).includes(s.name)?"#60a5fa":"#8080a0",
                               cursor:"pointer", fontSize:11 }}>
-                            {s.name}
+                            {(c.attached_services||[]).includes(s.name)?"✓ ":"+ "}{s.name}
                           </button>
                         ))}
-                        {services.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add services below first</span>}
+                        {services.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add services first</span>}
                       </div>
+                      {(c.attached_services||[]).length > 0 && (
+                        <>
+                          <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Button order (drag to rearrange — shows 2 per row in bot)</div>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                            {(c.attached_services||[]).map((name, idx) => (
+                              <div key={name}
+                                draggable
+                                onDragStart={e => { setDragSvc(name); e.dataTransfer.effectAllowed="move"; }}
+                                onDragOver={e => e.preventDefault()}
+                                onDrop={e => {
+                                  e.preventDefault();
+                                  if (!dragSvc || dragSvc===name) return;
+                                  setCommands(commands.map(cm => {
+                                    if (cm.id !== c.id && cm.cmd !== c.cmd) return cm;
+                                    const list = [...(cm.attached_services||[])];
+                                    const fi = list.indexOf(dragSvc), ti = list.indexOf(name);
+                                    if (fi===-1||ti===-1) return cm;
+                                    list.splice(fi,1); list.splice(ti,0,dragSvc);
+                                    return {...cm, attached_services:list};
+                                  }));
+                                  setDragSvc(null);
+                                }}
+                                style={{ background:"#12121f", border:`1px solid ${dragSvc===name?"#60a5fa":"#2a2a3e"}`,
+                                  borderRadius:8, padding:"8px 12px", fontSize:12, cursor:"grab",
+                                  display:"flex", alignItems:"center", gap:8, userSelect:"none",
+                                  opacity: dragSvc && dragSvc!==name ? 0.6 : 1 }}>
+                                <span style={{ color:"#4040a0", fontSize:14 }}>⠿</span>
+                                <span style={{ flex:1 }}>{name}</span>
+                                <span style={{ fontSize:10, color:"#4040a0" }}>#{idx+1}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
