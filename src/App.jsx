@@ -954,78 +954,123 @@ const CustomersPage = ({ selectedNode }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 50;
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (selectedNode) params.append("node_id", selectedNode.id);
-        if (tab==="banned") params.append("banned","true");
-        const data = await api(`/customers?${params}`);
-        setCustomers(data.customers||[]);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    };
-    load();
-  }, [selectedNode, tab]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedNode) params.append("node_id", selectedNode.id);
+      if (tab === "banned") params.append("banned", "true");
+      if (search) params.append("search", search);
+      params.append("page", page);
+      params.append("limit", limit);
+      const data = await api(`/customers?${params}`);
+      setCustomers(data.customers || []);
+      setTotal(data.total || 0);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, [selectedNode, tab, search, page]);
 
-  const filtered = customers.filter(c =>
-    [c.username, c.display_name, c.telegram_id?.toString()].some(v => v?.toLowerCase().includes(search.toLowerCase()))
-  );
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [tab, search, selectedNode]);
+
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div>
       <h1 style={{ margin:"0 0 4px", fontSize:24, fontWeight:800 }}>Customers</h1>
-      <p style={{ margin:"0 0 20px", color:"#6060a0", fontSize:13 }}>{selectedNode?`Showing customers from node: ${selectedNode.name}`:"Showing all customers across all nodes."}</p>
+      <p style={{ margin:"0 0 20px", color:"#6060a0", fontSize:13 }}>
+        {selectedNode ? `Showing customers from node: ${selectedNode.name}` : "Showing all customers across all nodes."}
+      </p>
       <div style={S.card}>
-        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", gap:4 }}>
-          {[["all","All"],["paid","Paid"],["banned","Banned"]].map(([id,label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{ padding:"6px 16px", borderRadius:8, border:"none", background:tab===id?"#6c4fd822":"transparent", color:tab===id?"#a78bfa":"#6060a0", cursor:"pointer", fontSize:13, fontWeight:tab===id?700:400 }}>{label}</button>
-          ))}
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", gap:4 }}>
+            {[["all","All"],["banned","Banned"]].map(([id,label]) => (
+              <button key={id} onClick={() => setTab(id)}
+                style={{ padding:"6px 16px", borderRadius:8, border:"none",
+                  background:tab===id?"#6c4fd822":"transparent",
+                  color:tab===id?"#a78bfa":"#6060a0", cursor:"pointer", fontSize:13, fontWeight:tab===id?700:400 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize:12, color:"#6060a0" }}>{total} total</span>
         </div>
         <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ color:"#6060a0" }}>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by username, name or ID..." style={{ ...S.input, border:"none", background:"transparent", padding:"4px 0" }}/>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by username, name or Telegram ID..."
+            style={{ ...S.input, border:"none", background:"transparent", padding:"4px 0" }}/>
         </div>
-        {loading ? <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading...</div>
-        : filtered.length===0 ? <div style={{ padding:"32px", textAlign:"center", color:"#4040a0", fontSize:13 }}>No customers yet. They'll appear here when they message your bot.</div>
-        : (
-          <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
-              <thead>
-                <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                  {["Telegram ID","Username","Display Name","Tickets","Paid","Revenue",""].map(h => (
-                    <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700, textTransform:"uppercase", letterSpacing:0.8 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c,i) => (
-                  <tr key={c.id} style={{ borderBottom:"1px solid #1a1a2a", background:i%2===0?"transparent":"#ffffff03" }}>
-                    <td style={{ padding:"10px 16px" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <div style={{ width:28, height:28, borderRadius:7, background:"#6c4fd822", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>💬</div>
-                        <span style={{ fontSize:12, color:"#6060a0" }}>{c.telegram_id}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding:"10px 16px", fontSize:13 }}>{c.username?<span style={{ color:"#60a5fa" }}>⊙ {c.username}</span>:<span style={{ color:"#4040a0" }}>⊘ No username</span>}</td>
-                    <td style={{ padding:"10px 16px", fontSize:13 }}>{c.display_name}</td>
-                    <td style={{ padding:"10px 16px" }}><span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}># {c.total_tickets||0}</span></td>
-                    <td style={{ padding:"10px 16px" }}><span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}># {c.paid_tickets||0}</span></td>
-                    <td style={{ padding:"10px 16px" }}><span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>$ {parseFloat(c.total_revenue||0).toFixed(2)}</span></td>
-                    <td style={{ padding:"10px 16px" }}><button style={{ ...S.btnOutline, fontSize:12 }}>View ▾</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {loading
+          ? <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading...</div>
+          : customers.length === 0
+            ? <div style={{ padding:"32px", textAlign:"center", color:"#4040a0", fontSize:13 }}>No customers yet.</div>
+            : (
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", minWidth:650 }}>
+                  <thead>
+                    <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                      {["Telegram ID","Username","Display Name","Tickets","Paid","Revenue"].map(h => (
+                        <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700, textTransform:"uppercase", letterSpacing:0.8 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.map((c,i) => (
+                      <tr key={c.id}
+                        style={{ borderBottom:"1px solid #1a1a2a", background:i%2===0?"transparent":"#ffffff03" }}
+                        onMouseEnter={e => e.currentTarget.style.background="#1a1a28"}
+                        onMouseLeave={e => e.currentTarget.style.background=i%2===0?"transparent":"#ffffff03"}>
+                        <td style={{ padding:"10px 16px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <div style={{ width:28, height:28, borderRadius:7, background:"#6c4fd822", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>💬</div>
+                            <span style={{ fontSize:12, color:"#6060a0", fontFamily:"monospace" }}>{c.telegram_id}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding:"10px 16px", fontSize:13 }}>
+                          {c.username
+                            ? <span style={{ color:"#60a5fa" }}>⊙ {c.username}</span>
+                            : <span style={{ color:"#3a3a6a" }}>⊘ No username</span>}
+                        </td>
+                        <td style={{ padding:"10px 16px", fontSize:13 }}>{c.display_name || "—"}</td>
+                        <td style={{ padding:"10px 16px" }}>
+                          <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>
+                            # {c.total_tickets||0}
+                          </span>
+                        </td>
+                        <td style={{ padding:"10px 16px" }}>
+                          <span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>
+                            # {c.paid_tickets||0}
+                          </span>
+                        </td>
+                        <td style={{ padding:"10px 16px" }}>
+                          <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>
+                            $ {parseFloat(c.total_revenue||0).toFixed(2)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+        <div style={{ padding:"10px 20px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:12, color:"#6060a0" }}>
+          <span>Page {page} of {totalPages||1} · {total} customers</span>
+          <div style={{ display:"flex", gap:4 }}>
+            <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
+              style={{ ...S.btnOutline, padding:"4px 10px", fontSize:12, opacity:page===1?0.4:1 }}>‹ Prev</button>
+            <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page>=totalPages}
+              style={{ ...S.btnOutline, padding:"4px 10px", fontSize:12, opacity:page>=totalPages?0.4:1 }}>Next ›</button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 };
-
 // ─── TICKETS PAGE ─────────────────────────────────────────────────────────────
 // ─── TICKET DETAIL PANEL ─────────────────────────────────────────────────────
 const TicketDetailPanel = ({ ticket, onClose }) => {
