@@ -1412,7 +1412,7 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
             <div style={S.card}>
               <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <span style={{ fontWeight:700, fontSize:13 }}>🛎 Services</span>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16" }}>⋯</button>
+                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16 }}>⋯</button>
               </div>
               <div>
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
