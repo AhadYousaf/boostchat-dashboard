@@ -616,6 +616,9 @@ const TelegramSettingsTab = ({ node }) => {
   const [newQuestion, setNewQuestion] = useState({ question:"", question_type:"text", options:[] });
   const [expandedCmd, setExpandedCmd] = useState(null);
   const [expandedSvc, setExpandedSvc] = useState(null);
+  const [expandedQ, setExpandedQ] = useState(null);
+  const [dragSvc, setDragSvc] = useState(null);
+  const [dragQ, setDragQ] = useState(null);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -684,6 +687,12 @@ const TelegramSettingsTab = ({ node }) => {
 
   if (loading) return <div style={{ padding:"32px", display:"flex", gap:12, color:"#6060a0" }}><Spinner size={14}/> Loading settings...</div>;
 
+  // Drag helpers for /start service order
+  const onDragStartSvc = (e, name) => { setDragSvc(name); e.dataTransfer.effectAllowed = "move"; };
+
+  // Drag helpers for question order in service
+  const onDragStartQ = (e, qId) => { setDragQ(qId); e.dataTransfer.effectAllowed = "move"; };
+
   return (
     <div>
       {error && <div style={{ background:"#e0505022", border:"1px solid #e0505044", borderRadius:8, padding:"10px 14px", color:"#f87171", fontSize:13, marginBottom:16 }}>⚠ {error}</div>}
@@ -691,11 +700,9 @@ const TelegramSettingsTab = ({ node }) => {
 
       {/* ── COMMANDS ── */}
       <div style={{ ...S.card, marginBottom:16 }}>
-        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div>
-            <div style={{ fontWeight:700, fontSize:13, color:"#60a5fa" }}>Commands</div>
-            <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Configure your bot commands. The /start command shows the service menu.</div>
-          </div>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
+          <div style={{ fontWeight:700, fontSize:13, color:"#60a5fa" }}>Commands</div>
+          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Configure your bot commands. The /start command shows the service menu.</div>
         </div>
         <div style={{ padding:"16px 20px" }}>
           {commands.map((c, i) => (
@@ -709,7 +716,7 @@ const TelegramSettingsTab = ({ node }) => {
                   <button onClick={() => setExpandedCmd(expandedCmd===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
                     {expandedCmd===i?"▲":"▼"}
                   </button>
-                  <button onClick={() => setCommands(commands.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                  <button onClick={() => { if(window.confirm("Delete this command?")) setCommands(commands.filter((_,j)=>j!==i)); }} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
                 </div>
               </div>
               {expandedCmd===i && (
@@ -717,10 +724,28 @@ const TelegramSettingsTab = ({ node }) => {
                   <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Welcome message</div>
                   <textarea value={c.message_content||""} onChange={e => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_content:e.target.value}:cmd))}
                     style={{ ...S.input, minHeight:60, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="Message shown when customer uses this command..."/>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Command image (sent before message)</div>
+                  {c.message_image && (
+                    <div style={{ marginBottom:8, position:"relative", display:"inline-block" }}>
+                      <img src={c.message_image} alt="Command" style={{ maxWidth:180, maxHeight:120, borderRadius:8, border:"1px solid #2a2a3e", display:"block" }}/>
+                      <button onClick={() => { if(window.confirm("Remove this image?")) setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_image:null}:cmd)); }}
+                        style={{ position:"absolute", top:-6, right:-6, background:"#e05050", border:"none", borderRadius:"50%", width:20, height:20, color:"#fff", cursor:"pointer", fontSize:11, display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+                    </div>
+                  )}
+                  <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", background:"#1a1a28", border:"1px dashed #2a2a3e", borderRadius:8, padding:"8px 14px", fontSize:12, color:"#6060a0", marginBottom:10, width:"fit-content" }}>
+                    📷 {c.message_image ? "Change image" : "Upload image"}
+                    <input type="file" accept="image/*" style={{ display:"none" }} onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_image:ev.target.result}:cmd));
+                      reader.readAsDataURL(file);
+                    }}/>
+                  </label>
                   {c.cmd === '/start' && (
                     <>
-                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached services (shown as buttons)</div>
-                      <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:8, fontWeight:600 }}>Attached services — click to toggle, drag to reorder (2 per row in bot)</div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
                         {services.map(s => (
                           <button key={s.id||s.name} onClick={() => toggleServiceOnCommand(c.id||c.cmd, s.name)}
                             style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
@@ -728,11 +753,45 @@ const TelegramSettingsTab = ({ node }) => {
                               background:(c.attached_services||[]).includes(s.name)?"#60a5fa22":"transparent",
                               color:(c.attached_services||[]).includes(s.name)?"#60a5fa":"#8080a0",
                               cursor:"pointer", fontSize:11 }}>
-                            {s.name}
+                            {(c.attached_services||[]).includes(s.name)?"✓ ":"+ "}{s.name}
                           </button>
                         ))}
-                        {services.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add services below first</span>}
+                        {services.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add services first</span>}
                       </div>
+                      {(c.attached_services||[]).length > 0 && (
+                        <>
+                          <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Button order (drag to rearrange — 2 per row in bot)</div>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                            {(c.attached_services||[]).map((name, idx) => (
+                              <div key={name}
+                                draggable
+                                onDragStart={e => onDragStartSvc(e, name)}
+                                onDragOver={e => e.preventDefault()}
+                                onDrop={e => {
+                                  e.preventDefault();
+                                  if (!dragSvc || dragSvc===name) return;
+                                  setCommands(commands.map(cm => {
+                                    if (cm.id !== c.id && cm.cmd !== c.cmd) return cm;
+                                    const list = [...(cm.attached_services||[])];
+                                    const fi = list.indexOf(dragSvc), ti = list.indexOf(name);
+                                    if (fi===-1||ti===-1) return cm;
+                                    list.splice(fi,1); list.splice(ti,0,dragSvc);
+                                    return {...cm, attached_services:list};
+                                  }));
+                                  setDragSvc(null);
+                                }}
+                                style={{ background:"#12121f", border:`1px solid ${dragSvc===name?"#60a5fa":"#2a2a3e"}`,
+                                  borderRadius:8, padding:"8px 12px", fontSize:12, cursor:"grab",
+                                  display:"flex", alignItems:"center", gap:8, userSelect:"none",
+                                  opacity: dragSvc && dragSvc!==name ? 0.6 : 1 }}>
+                                <span style={{ color:"#4040a0", fontSize:14 }}>⠿</span>
+                                <span style={{ flex:1 }}>{name}</span>
+                                <span style={{ fontSize:10, color:"#4040a0" }}>#{idx+1}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -743,35 +802,6 @@ const TelegramSettingsTab = ({ node }) => {
             <input style={{ ...S.input, flex:"0 0 120px" }} placeholder="/command" value={newCmd.cmd} onChange={e=>setNewCmd({...newCmd,cmd:e.target.value})}/>
             <input style={{ ...S.input, flex:1 }} placeholder="Description" value={newCmd.desc} onChange={e=>setNewCmd({...newCmd,desc:e.target.value})}/>
             <button onClick={addCommand} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── QUESTIONS ── */}
-      <div style={{ ...S.card, marginBottom:16 }}>
-        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
-          <div style={{ fontWeight:700, fontSize:13, color:"#a78bfa" }}>Questions</div>
-          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Create questions customers must answer when creating a ticket. Attach them to services below.</div>
-        </div>
-        <div style={{ padding:"16px 20px" }}>
-          {questions.map((q, i) => (
-            <div key={q.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div>
-                <span style={{ fontSize:13, color:"#e2e2f0" }}>{q.question}</span>
-                <span style={{ marginLeft:8, background:"#a78bfa22", color:"#a78bfa", border:"1px solid #a78bfa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{q.question_type||"text"}</span>
-              </div>
-              <button onClick={() => setQuestions(questions.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
-            </div>
-          ))}
-          <div style={{ display:"flex", gap:8, marginTop:8 }}>
-            <input style={{ ...S.input, flex:1 }} placeholder="Question text e.g. What is your address?" value={newQuestion.question} onChange={e=>setNewQuestion({...newQuestion,question:e.target.value})}/>
-            <select style={{ ...S.input, flex:"0 0 130px" }} value={newQuestion.question_type} onChange={e=>setNewQuestion({...newQuestion,question_type:e.target.value})}>
-              <option value="text">Text</option>
-              <option value="photo">Photo</option>
-              <option value="number">Number</option>
-              <option value="inline_preset_buttons">Buttons</option>
-            </select>
-            <button onClick={addQuestion} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
           </div>
         </div>
       </div>
@@ -791,7 +821,7 @@ const TelegramSettingsTab = ({ node }) => {
                   <button onClick={() => setExpandedSvc(expandedSvc===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
                     {expandedSvc===i?"▲":"···"}
                   </button>
-                  <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                  <button onClick={() => { if(window.confirm("Delete this service?")) setServices(services.filter((_,j)=>j!==i)); }} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
                 </div>
               </div>
               {expandedSvc===i && (
@@ -799,8 +829,8 @@ const TelegramSettingsTab = ({ node }) => {
                   <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Open message (shown when customer selects this service)</div>
                   <textarea value={s.open_message_content||""} onChange={e => setServices(services.map((sv,j)=>j===i?{...sv,open_message_content:e.target.value}:sv))}
                     style={{ ...S.input, minHeight:50, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="e.g. Thanks for choosing this service! Please answer the following questions..."/>
-                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached questions (asked in order)</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached questions — click to toggle, drag to reorder</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
                     {questions.map(q => (
                       <button key={q.id||q.question} onClick={() => toggleQuestionOnService(s.id||s.name, q.id)}
                         style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
@@ -808,11 +838,48 @@ const TelegramSettingsTab = ({ node }) => {
                           background:(s.attached_questions||[]).includes(q.id)?"#34d39822":"transparent",
                           color:(s.attached_questions||[]).includes(q.id)?"#34d398":"#8080a0",
                           cursor:"pointer", fontSize:11 }}>
-                        {q.question?.slice(0,30)}{(q.question?.length||0)>30?"...":""}
+                        {(s.attached_questions||[]).includes(q.id)?"✓ ":"+ "}{q.question?.slice(0,28)}{(q.question?.length||0)>28?"...":""}
                       </button>
                     ))}
-                    {questions.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add questions above first</span>}
+                    {questions.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add questions below first</span>}
                   </div>
+                  {(s.attached_questions||[]).length > 0 && (
+                    <>
+                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Question order (drag to rearrange)</div>
+                      {(s.attached_questions||[]).map((qId, idx) => {
+                        const q = questions.find(q => q.id === qId);
+                        if (!q) return null;
+                        return (
+                          <div key={qId}
+                            draggable
+                            onDragStart={e => onDragStartQ(e, qId)}
+                            onDragOver={e => e.preventDefault()}
+                            onDrop={e => {
+                              e.preventDefault();
+                              if (!dragQ || dragQ===qId) return;
+                              setServices(services.map(sv => {
+                                if (sv.id !== s.id) return sv;
+                                const list = [...(sv.attached_questions||[])];
+                                const fi = list.indexOf(dragQ), ti = list.indexOf(qId);
+                                if (fi===-1||ti===-1) return sv;
+                                list.splice(fi,1); list.splice(ti,0,dragQ);
+                                return {...sv, attached_questions:list};
+                              }));
+                              setDragQ(null);
+                            }}
+                            style={{ background:"#12121f", border:`1px solid ${dragQ===qId?"#34d398":"#2a2a3e"}`,
+                              borderRadius:8, padding:"8px 12px", marginBottom:6, fontSize:12,
+                              cursor:"grab", display:"flex", alignItems:"center", gap:8, userSelect:"none",
+                              opacity: dragQ && dragQ!==qId ? 0.6 : 1 }}>
+                            <span style={{ color:"#4040a0", fontSize:14 }}>⠿</span>
+                            <span style={{ flex:1 }}>{q.question}</span>
+                            <span style={{ background:"#a78bfa22", color:"#a78bfa", border:"1px solid #a78bfa44", borderRadius:4, padding:"1px 6px", fontSize:10 }}>{q.question_type||"text"}</span>
+                            <span style={{ fontSize:10, color:"#4040a0" }}>#{idx+1}</span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -820,6 +887,74 @@ const TelegramSettingsTab = ({ node }) => {
           <div style={{ display:"flex", gap:8, marginTop:8 }}>
             <input style={{ ...S.input, flex:1 }} placeholder="Service name e.g. 🍔 5Guys" value={newService.name} onChange={e=>setNewService({...newService,name:e.target.value})}/>
             <button onClick={addService} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── QUESTIONS ── */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
+          <div style={{ fontWeight:700, fontSize:13, color:"#a78bfa" }}>Questions</div>
+          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Create questions customers must answer when creating a ticket. Attach them to services above.</div>
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {questions.map((q, i) => (
+            <div key={q.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <span style={{ fontSize:13, color:"#e2e2f0" }}>{q.question}</span>
+                  <span style={{ marginLeft:8, background:"#a78bfa22", color:"#a78bfa", border:"1px solid #a78bfa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{q.question_type||"text"}</span>
+                  {q.message_content && (
+                    <div style={{ fontSize:11, color:"#6060a0", marginTop:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      💬 {q.message_content}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display:"flex", gap:6, flexShrink:0, marginLeft:8 }}>
+                  <button onClick={() => setExpandedQ(expandedQ===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
+                    {expandedQ===i?"▲":"✏"}
+                  </button>
+                  <button onClick={() => { if(window.confirm("Delete this question?")) setQuestions(questions.filter((_,j)=>j!==i)); }} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                </div>
+              </div>
+              {expandedQ===i && (
+                <div style={{ marginTop:10, borderTop:"1px solid #2a2a3e", paddingTop:10 }}>
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ fontSize:11, color:"#6060a0", marginBottom:5, fontWeight:600 }}>Question name / label</div>
+                    <input style={{ ...S.input, fontSize:12 }} value={q.question||""}
+                      onChange={e => setQuestions(questions.map((qq,j)=>j===i?{...qq,question:e.target.value}:qq))}
+                      placeholder="Internal label e.g. OrderName"/>
+                  </div>
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ fontSize:11, color:"#6060a0", marginBottom:5, fontWeight:600 }}>Message sent to customer</div>
+                    <textarea style={{ ...S.input, minHeight:60, resize:"vertical", fontSize:12 }}
+                      value={q.message_content||""}
+                      onChange={e => setQuestions(questions.map((qq,j)=>j===i?{...qq,message_content:e.target.value}:qq))}
+                      placeholder="e.g. What name would you like on the order? 👤"/>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#6060a0", marginBottom:5, fontWeight:600 }}>Question type</div>
+                    <select style={{ ...S.input, fontSize:12 }} value={q.question_type||"text"}
+                      onChange={e => setQuestions(questions.map((qq,j)=>j===i?{...qq,question_type:e.target.value}:qq))}>
+                      <option value="text">Text</option>
+                      <option value="photo">Photo</option>
+                      <option value="number">Number</option>
+                      <option value="inline_preset_buttons">Buttons</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:8, marginTop:8 }}>
+            <input style={{ ...S.input, flex:1 }} placeholder="Question label e.g. OrderName" value={newQuestion.question} onChange={e=>setNewQuestion({...newQuestion,question:e.target.value})}/>
+            <select style={{ ...S.input, flex:"0 0 130px" }} value={newQuestion.question_type} onChange={e=>setNewQuestion({...newQuestion,question_type:e.target.value})}>
+              <option value="text">Text</option>
+              <option value="photo">Photo</option>
+              <option value="number">Number</option>
+              <option value="inline_preset_buttons">Buttons</option>
+            </select>
+            <button onClick={addQuestion} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
           </div>
         </div>
       </div>
