@@ -1027,13 +1027,192 @@ const CustomersPage = ({ selectedNode }) => {
 };
 
 // ─── TICKETS PAGE ─────────────────────────────────────────────────────────────
+// ─── TICKET DETAIL PANEL ─────────────────────────────────────────────────────
+const TicketDetailPanel = ({ ticket, onClose }) => {
+  const [detail, setDetail] = useState(null);
+  const [answers, setAnswers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await api(`/tickets/${ticket.id}`);
+        setDetail(data);
+        // Load question answers
+        const ans = await api(`/tickets/${ticket.id}/answers`).catch(() => ({ answers: [] }));
+        setAnswers(ans.answers || []);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    };
+    load();
+  }, [ticket.id]);
+
+  const summarize = async () => {
+    if (!detail?.messages?.length) return;
+    setSummarizing(true);
+    try {
+      const conversation = detail.messages.map(m =>
+        `${m.sender_name || m.sender_type}: ${m.content || '[media]'}`
+      ).join('
+');
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 300,
+          messages: [{ role: 'user', content: `Summarize this customer support conversation in 2-3 sentences. Focus on what the customer needed, what the worker did, and the outcome:
+
+${conversation}` }]
+        })
+      });
+      const data = await res.json();
+      setSummary(data.content?.[0]?.text || 'Could not generate summary.');
+    } catch (err) { setSummary('Could not generate summary.'); }
+    finally { setSummarizing(false); }
+  };
+
+  const sc = { open:"#f59e0b", pending:"#f59e0b", in_progress:"#60a5fa", paid:"#34d398", closed:"#6060a0", cancelled:"#e05050" };
+  const statusColor = sc[ticket.status] || "#6060a0";
+  const hasPaid = parseFloat(ticket.amount_paid || 0) > 0;
+
+  const formatTime = (d) => new Date(d).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  const formatDate = (d) => new Date(d).toLocaleDateString([], { month:'short', day:'numeric', year:'numeric' });
+
+  return (
+    <div style={{ width:440, borderLeft:"1px solid #1e1e2e", background:"#0f0f17", display:"flex", flexDirection:"column", flexShrink:0, overflow:"hidden" }}>
+      {/* Header */}
+      <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+        <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, flexShrink:0 }}>
+          {(ticket.customer_username || ticket.customer_display || "?")[0].toUpperCase()}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#60a5fa", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            {ticket.customer_username ? `@${ticket.customer_username}` : ticket.customer_display || "Unknown"}
+          </div>
+          <div style={{ fontSize:10, color:"#5a5a80" }}>
+            {ticket.telegram_id || ticket.customer_telegram_id || ""} · #{ticket.ticket_number}
+          </div>
+        </div>
+        <span style={{ background:statusColor+"22", color:statusColor, border:`1px solid ${statusColor}44`, borderRadius:4, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+          {ticket.status}
+        </span>
+        <button onClick={onClose} style={{ background:"transparent", border:"none", color:"#6060a0", cursor:"pointer", fontSize:18, lineHeight:1, padding:"2px 4px" }}>✕</button>
+      </div>
+
+      <div style={{ flex:1, overflowY:"auto" }}>
+        {loading ? (
+          <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:10, color:"#6060a0" }}><Spinner size={16}/> Loading...</div>
+        ) : (
+          <>
+            {/* AI Summary */}
+            <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:"#a78bfa" }}>✦ AI Summarization</span>
+                <button onClick={summarize} disabled={summarizing}
+                  style={{ background:"#6c4fd822", border:"1px solid #6c4fd844", borderRadius:6, padding:"2px 10px", color:"#a78bfa", cursor:"pointer", fontSize:10, fontWeight:600 }}>
+                  {summarizing ? "Generating..." : "Generate"}
+                </button>
+              </div>
+              {summary ? (
+                <div style={{ fontSize:12, color:"#c0c0e0", lineHeight:1.6, background:"#1a1a2e", borderRadius:8, padding:"10px 12px", border:"1px solid #2a2a4e" }}>
+                  {summary}
+                </div>
+              ) : (
+                <div style={{ fontSize:11, color:"#4a4a70", fontStyle:"italic" }}>Click Generate to summarize this conversation with AI.</div>
+              )}
+            </div>
+
+            {/* Payment info */}
+            {hasPaid && (
+              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", background:"rgba(52,211,152,0.05)" }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#34d398", marginBottom:4 }}>💰 Payment Recorded</div>
+                <div style={{ fontSize:12, color:"#c0c0e0" }}>
+                  ${parseFloat(ticket.amount_paid).toFixed(2)} · marked by {ticket.worker_username || "worker"} · {ticket.closed_at ? formatDate(ticket.closed_at) : "—"}
+                </div>
+              </div>
+            )}
+
+            {/* Question answers */}
+            {answers.length > 0 && (
+              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e" }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#6060a0", marginBottom:8 }}>Question Data ({answers.length})</div>
+                {answers.map((a, i) => (
+                  <div key={i} style={{ marginBottom:6 }}>
+                    <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600 }}>{i+1}. {a.question}</div>
+                    <div style={{ fontSize:12, color:"#c0c0e0", marginTop:2, paddingLeft:8 }}>
+                      {a.media_url
+                        ? <a href={a.media_url} target="_blank" style={{ color:"#60a5fa" }}>📷 View photo</a>
+                        : a.customer_answer || "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Chat log */}
+            <div style={{ padding:"10px 16px" }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#6060a0", marginBottom:12 }}>
+                START OF THE CONVERSATION
+              </div>
+              {!detail?.messages?.length ? (
+                <div style={{ fontSize:12, color:"#4a4a70", textAlign:"center", padding:"20px 0" }}>No messages yet.</div>
+              ) : (
+                detail.messages.map((m, i) => {
+                  const isWorker = m.sender_type === 'worker';
+                  const isCustomer = m.sender_type === 'customer';
+                  const prevMsg = detail.messages[i - 1];
+                  const showDate = !prevMsg || formatDate(m.created_at) !== formatDate(prevMsg.created_at);
+                  return (
+                    <div key={m.id || i}>
+                      {showDate && (
+                        <div style={{ textAlign:"center", fontSize:10, color:"#4a4a70", margin:"12px 0 8px", fontWeight:600 }}>
+                          {formatDate(m.created_at)}
+                        </div>
+                      )}
+                      <div style={{ display:"flex", gap:8, marginBottom:8, flexDirection:isWorker?"row-reverse":"row" }}>
+                        <div style={{ width:24, height:24, borderRadius:"50%", background:isWorker?"#6c4fd8":"#2a2a4e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, flexShrink:0, marginTop:2 }}>
+                          {(m.sender_name || m.sender_type || "?")[0].toUpperCase()}
+                        </div>
+                        <div style={{ maxWidth:"75%", minWidth:0 }}>
+                          <div style={{ fontSize:10, color:"#5a5a80", marginBottom:2, textAlign:isWorker?"right":"left" }}>
+                            {m.sender_name || (isWorker ? "Worker" : "Customer")}
+                          </div>
+                          <div style={{ background:isWorker?"#2a1a4e":"#1a1a28", border:isWorker?"1px solid #3a2a5e":"1px solid #2a2a3e", borderRadius:isWorker?"12px 12px 2px 12px":"12px 12px 12px 2px", padding:"7px 10px", fontSize:12, color:"#e0e0f0", lineHeight:1.5, wordBreak:"break-word" }}>
+                            {m.content || (m.media_url ? <a href={m.media_url} target="_blank" style={{ color:"#60a5fa" }}>📷 View media</a> : "—")}
+                          </div>
+                          <div style={{ fontSize:9, color:"#4a4a70", marginTop:2, textAlign:isWorker?"right":"left" }}>
+                            {formatTime(m.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div style={{ textAlign:"center", fontSize:10, color:"#4a4a70", marginTop:12, fontWeight:600 }}>
+                END OF THE CONVERSATION
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const TicketsPage = ({ selectedNode }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ all:0, open:0, closed:0, paid:0 });
   const [page, setPage] = useState(1);
+  const [selectedTicket, setSelectedTicket] = useState(null);
   const limit = 50;
 
   const load = useCallback(async () => {
@@ -1047,6 +1226,7 @@ const TicketsPage = ({ selectedNode }) => {
       const data = await api(`/tickets?${params}`);
       setTickets(data.tickets || []);
       setTotal(data.total || 0);
+      if (data.counts) setCounts(data.counts);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [selectedNode, filter, page]);
@@ -1059,7 +1239,6 @@ const TicketsPage = ({ selectedNode }) => {
 
   const statusColor = (s) => ({ open:"#f59e0b", pending:"#f59e0b", in_progress:"#60a5fa", paid:"#34d398", closed:"#6060a0", cancelled:"#e05050", deleted:"#e05050" }[s] || "#6060a0");
   const statusLabel = (s) => ({ open:"Open", pending:"Pending", in_progress:"Active", paid:"Paid", closed:"Closed", cancelled:"Cancelled", deleted:"Deleted" }[s] || s);
-
   const timeAgo = (date) => {
     const s = Math.floor((new Date() - new Date(date)) / 1000);
     if (s < 60) return `${s}s ago`;
@@ -1071,12 +1250,11 @@ const TicketsPage = ({ selectedNode }) => {
   const totalPages = Math.ceil(total / limit);
 
   const filterItems = [
-    ["all","All","#a78bfa"],
-    ["open","Open","#f59e0b"],
-    ["in_progress","Active","#60a5fa"],
-    ["paid","Paid","#34d398"],
-    ["closed","Closed","#6060a0"],
-    ["cancelled","Cancelled","#e05050"],
+    ["all","All","#a78bfa", null],
+    ["open","Open","#60a5fa", counts.open],
+    ["closed","Closed","#e05050", counts.closed],
+    ["paid","Paid","#34d398", counts.paid],
+    ["cancelled","Cancelled","#f59e0b", null],
   ];
 
   return (
@@ -1086,7 +1264,7 @@ const TicketsPage = ({ selectedNode }) => {
         <div style={{ fontSize:9, color:"#3a3a5a", textTransform:"uppercase", letterSpacing:1.2, marginBottom:8, padding:"0 8px" }}>
           {selectedNode ? selectedNode.name.toUpperCase() : "ALL NODES"}
         </div>
-        {filterItems.map(([id, label, color]) => (
+        {filterItems.map(([id, label, color, count]) => (
           <button key={id} onClick={() => { setFilter(id); setPage(1); }}
             style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"6px 10px", borderRadius:6, border:"none",
               background:filter===id?"rgba(108,79,216,0.15)":"transparent",
@@ -1095,58 +1273,28 @@ const TicketsPage = ({ selectedNode }) => {
             {id === "all"
               ? <span style={{ fontSize:13, lineHeight:1 }}>≡</span>
               : <span style={{ width:7, height:7, borderRadius:"50%", background:color, flexShrink:0, display:"inline-block" }}/>}
-            {label}
+            <span style={{ flex:1, textAlign:"left" }}>{label}</span>
+            {count != null && (
+              <span style={{ fontSize:10, fontWeight:700, color, background:color+"22", border:`1px solid ${color}44`, borderRadius:4, padding:"0px 5px", lineHeight:"16px" }}>
+                {count >= 1000 ? `${(count/1000).toFixed(1)}k` : count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {/* Main content */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
-
         {/* Toolbar */}
-        <div style={{ padding:"8px 14px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8, flexShrink:0, background:"#0f0f17" }}>
+        <div style={{ padding:"8px 14px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search tickets, services, contractors..."
-            style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:6, padding:"5px 10px", color:"#e2e2f0", fontSize:12, outline:"none", flex:1, maxWidth:300 }}/>
-          <div style={{ display:"flex", alignItems:"center", gap:6, background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:6, padding:"5px 10px", cursor:"pointer" }}>
-            <span style={{ fontSize:11, color:"#6060a0" }}>◈</span>
-            <span style={{ fontSize:12, color:"#9090b8" }}>Anything that matches</span>
-            <span style={{ fontSize:11, color:"#6060a0" }}>▾</span>
-          </div>
-          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:8 }}>
-            <button onClick={load} style={{ background:"transparent", border:"1px solid #e0505066", borderRadius:6, padding:"5px 14px", color:"#e05050", cursor:"pointer", fontSize:12, fontWeight:600 }}>
-              Close All Tickets
-            </button>
-          </div>
+            placeholder="Search tickets..."
+            style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:6, padding:"5px 10px", color:"#e2e2f0", fontSize:12, outline:"none", flex:1, maxWidth:280 }}/>
+          <span style={{ fontSize:11, color:"#6060a0", whiteSpace:"nowrap" }}>{total} total</span>
+          <button onClick={load} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px", marginLeft:"auto" }}>↻</button>
         </div>
 
-        {/* Table header */}
-        <div style={{ background:"#0f0f17", borderBottom:"1px solid #1e1e2e", flexShrink:0 }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", tableLayout:"fixed" }}>
-            <colgroup>
-              <col style={{ width:32 }}/>
-              <col style={{ width:32 }}/>
-              <col style={{ width:"26%" }}/>
-              <col style={{ width:"22%" }}/>
-              <col style={{ width:"20%" }}/>
-              <col style={{ width:"15%" }}/>
-              <col style={{ width:"15%" }}/>
-            </colgroup>
-            <thead>
-              <tr>
-                <th style={{ padding:"8px 6px" }}></th>
-                <th style={{ padding:"8px 6px" }}></th>
-                <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#5a5a80", fontWeight:700, letterSpacing:0.5 }}>USERNAME/KEY</th>
-                <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#5a5a80", fontWeight:700, letterSpacing:0.5 }}>SERVICE NAME</th>
-                <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#5a5a80", fontWeight:700, letterSpacing:0.5 }}>LAST MESSAGE WITHIN TICKET</th>
-                <th style={{ padding:"8px 12px", textAlign:"right", fontSize:10, color:"#5a5a80", fontWeight:700, letterSpacing:0.5 }}></th>
-                <th style={{ padding:"8px 12px", textAlign:"right", fontSize:10, color:"#5a5a80", fontWeight:700, letterSpacing:0.5 }}></th>
-              </tr>
-            </thead>
-          </table>
-        </div>
-
-        {/* Table body — scrollable */}
+        {/* Table */}
         <div style={{ overflowY:"auto", flex:1 }}>
           {loading ? (
             <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading...</div>
@@ -1159,66 +1307,73 @@ const TicketsPage = ({ selectedNode }) => {
           ) : (
             <table style={{ width:"100%", borderCollapse:"collapse", tableLayout:"fixed" }}>
               <colgroup>
-                <col style={{ width:32 }}/>
-                <col style={{ width:32 }}/>
-                <col style={{ width:"26%" }}/>
+                <col style={{ width:28 }}/>
                 <col style={{ width:"22%" }}/>
-                <col style={{ width:"20%" }}/>
-                <col style={{ width:"15%" }}/>
-                <col style={{ width:"15%" }}/>
+                <col style={{ width:"18%" }}/>
+                <col style={{ width:"14%" }}/>
+                <col style={{ width:"18%" }}/>
+                <col style={{ width:"12%" }}/>
+                <col style={{ width:"12%" }}/>
               </colgroup>
+              <thead style={{ position:"sticky", top:0, background:"#13131a", zIndex:5 }}>
+                <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                  <th style={{ padding:"8px 8px" }}></th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>CUSTOMER</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>SERVICE</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>STATUS</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>WORKER</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>PAID</th>
+                  <th style={{ padding:"8px 12px", textAlign:"right", fontSize:10, color:"#6060a0", fontWeight:700 }}>TIME</th>
+                </tr>
+              </thead>
               <tbody>
                 {filtered.map(t => {
                   const sc = statusColor(t.status);
                   const hasPaid = parseFloat(t.amount_paid || 0) > 0;
-                  const hasPaidWorker = t.worker_username && hasPaid;
+                  const isSelected = selectedTicket?.id === t.id;
                   return (
                     <tr key={t.id}
-                      style={{ borderBottom:"1px solid #191926", cursor:"pointer", transition:"background 0.1s" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#16161f"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      {/* X button */}
-                      <td style={{ padding:"6px 4px 6px 10px", textAlign:"center" }}>
-                        <button style={{ background:"transparent", border:"none", color:"#e05050", cursor:"pointer", fontSize:13, lineHeight:1, padding:2, borderRadius:4 }}>✕</button>
+                      onClick={() => setSelectedTicket(isSelected ? null : t)}
+                      style={{ borderBottom:"1px solid #1a1a2a", cursor:"pointer",
+                        background: isSelected ? "#1e1a3e" : hasPaid ? "rgba(52,211,152,0.04)" : "transparent" }}
+                      onMouseEnter={e => e.currentTarget.style.background = isSelected ? "#1e1a3e" : hasPaid ? "rgba(52,211,152,0.08)" : "#1a1a28"}
+                      onMouseLeave={e => e.currentTarget.style.background = isSelected ? "#1e1a3e" : hasPaid ? "rgba(52,211,152,0.04)" : "transparent"}>
+                      <td style={{ padding:"8px 8px", textAlign:"center" }}>
+                        <div style={{ width:7, height:7, borderRadius:"50%", background:sc, margin:"0 auto" }}/>
                       </td>
-                      {/* Avatar */}
-                      <td style={{ padding:"6px 4px", textAlign:"center" }}>
-                        <div style={{ width:26, height:26, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, flexShrink:0, margin:"0 auto" }}>
-                          {(t.customer_username || t.customer_display || "?")[0].toUpperCase()}
+                      <td style={{ padding:"8px 12px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <div style={{ width:24, height:24, borderRadius:"50%", background:"#2a2a4e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, flexShrink:0 }}>
+                            {(t.customer_username || t.customer_display || "?")[0].toUpperCase()}
+                          </div>
+                          <span style={{ fontSize:12, color:"#60a5fa", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {t.customer_username ? `@${t.customer_username}` : t.customer_display || "Unknown"}
+                          </span>
                         </div>
                       </td>
-                      {/* Username */}
-                      <td style={{ padding:"6px 12px" }}>
-                        <span style={{ fontSize:12, color:"#60a5fa", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block" }}>
-                          {t.customer_username ? `@${t.customer_username}` : t.customer_display || "Unknown"}
+                      <td style={{ padding:"8px 12px" }}>
+                        <span style={{ fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block" }}>
+                          {t.service_name || "—"}
                         </span>
                       </td>
-                      {/* Service */}
-                      <td style={{ padding:"6px 12px" }}>
-                        {t.service_name
-                          ? <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                              <span style={{ width:16, height:16, borderRadius:4, background:"#2a2a4e", display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:9, flexShrink:0 }}>🛎</span>
-                              <span style={{ fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.service_name}</span>
-                            </div>
-                          : <span style={{ color:"#3a3a6a", fontSize:12 }}>—</span>}
-                      </td>
-                      {/* Last message */}
-                      <td style={{ padding:"6px 12px" }}>
-                        <span style={{ fontSize:11, color:"#6060a0", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block" }}>
-                          {t.last_message || t.status || "—"}
+                      <td style={{ padding:"8px 12px" }}>
+                        <span style={{ background:sc+"22", color:sc, border:`1px solid ${sc}44`, borderRadius:4, padding:"2px 7px", fontSize:10, fontWeight:700, whiteSpace:"nowrap" }}>
+                          {statusLabel(t.status)}
                         </span>
                       </td>
-                      {/* Worker + paid badge */}
-                      <td style={{ padding:"6px 8px", textAlign:"right" }}>
-                        {hasPaidWorker && (
-                          <div style={{ display:"inline-flex", alignItems:"center", gap:4, background:"#1a1a2e", border:"1px solid #2a2a4e", borderRadius:6, padding:"2px 8px" }}>
-                            <span style={{ fontSize:10, color:"#a78bfa", fontWeight:600 }}>👤 {t.worker_username}</span>
-                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 6px", fontSize:10, fontWeight:700 }}>${parseFloat(t.amount_paid).toFixed(2)}</span>
-                          </div>
-                        )}
+                      <td style={{ padding:"8px 12px" }}>
+                        {t.worker_username
+                          ? <span style={{ fontSize:12, color:"#a78bfa", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block" }}>{t.worker_username}</span>
+                          : <span style={{ color:"#3a3a6a", fontSize:11 }}>—</span>}
                       </td>
-                      {/* Time */}
-                      <td style={{ padding:"6px 12px", fontSize:11, color:"#5a5a80", textAlign:"right", whiteSpace:"nowrap" }}>
+                      <td style={{ padding:"8px 12px" }}>
+                        {hasPaid
+                          ? <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"2px 7px", fontSize:10, fontWeight:700 }}>
+                              ${parseFloat(t.amount_paid).toFixed(2)}
+                            </span>
+                          : <span style={{ color:"#3a3a6a", fontSize:11 }}>—</span>}
+                      </td>
+                      <td style={{ padding:"8px 12px", fontSize:11, color:"#6060a0", textAlign:"right", whiteSpace:"nowrap" }}>
                         {timeAgo(t.updated_at)}
                       </td>
                     </tr>
@@ -1230,67 +1385,22 @@ const TicketsPage = ({ selectedNode }) => {
         </div>
 
         {/* Pagination */}
-        <div style={{ padding:"7px 16px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11, color:"#5a5a80", flexShrink:0, background:"#0f0f17" }}>
-          <span>0 selected / {total} total</span>
-          <div style={{ display:"flex", alignItems:"center", gap:3 }}>
-            <button onClick={() => setPage(1)} disabled={page===1}
-              style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>«</button>
+        <div style={{ padding:"8px 16px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11, color:"#6060a0", flexShrink:0 }}>
+          <span>{filtered.length} shown / {total} total</span>
+          <div style={{ display:"flex", gap:4 }}>
             <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}
-              style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>‹</button>
-            {Array.from({length:Math.min(5,totalPages||1)},(_,i)=>i+1).map(n => (
-              <button key={n} onClick={() => setPage(n)}
-                style={{ background:page===n?"#6c4fd833":"transparent", border:`1px solid ${page===n?"#6c4fd8":"#2a2a3e"}`, borderRadius:4, padding:"2px 8px",
-                  color:page===n?"#a78bfa":"#9090b8", cursor:"pointer", fontSize:12, fontWeight:page===n?700:400, minWidth:28 }}>{n}</button>
-            ))}
-            {(totalPages||1) > 5 && <span style={{ color:"#4a4a6a", fontSize:12 }}>...</span>}
+              style={{ ...S.btnOutline, padding:"3px 8px", fontSize:11, opacity:page===1?0.4:1 }}>‹</button>
+            <span style={{ padding:"3px 8px", fontSize:11, color:"#a0a0c0" }}>Page {page} of {totalPages||1}</span>
             <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page>=totalPages}
-              style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=totalPages?0.4:1 }}>›</button>
-            <button onClick={() => setPage(totalPages)} disabled={page>=totalPages}
-              style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=totalPages?0.4:1 }}>»</button>
+              style={{ ...S.btnOutline, padding:"3px 8px", fontSize:11, opacity:page>=totalPages?0.4:1 }}>›</button>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
 
-// ─── DUAL LINE CHART (Revenue + Profits) ─────────────────────────────────────
-const DualLineChart = ({ data = [], height = 200 }) => {
-  if (!data.length) return <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:12 }}>No data yet</div>;
-  const maxRev = Math.max(...data.map(d => d.revenue || 0), 1);
-  const maxPro = Math.max(...data.map(d => d.profit || 0), 1);
-  const w = 800, h = height;
-  const revPts = data.map((d,i) => `${(i/(data.length-1||1))*w},${h-(d.revenue/maxRev)*(h-20)-10}`);
-  const proPts = data.map((d,i) => `${(i/(data.length-1||1))*w},${h-(d.profit/maxPro)*(h-20)-10}`);
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width:"100%", height }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.3"/>
-          <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.02"/>
-        </linearGradient>
-      </defs>
-      <polygon points={`0,${h} ${revPts.join(" ")} ${w},${h}`} fill="url(#revGrad)"/>
-      <polyline points={revPts.join(" ")} fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinejoin="round"/>
-      <polyline points={proPts.join(" ")} fill="none" stroke="#34d398" strokeWidth="2" strokeLinejoin="round" strokeDasharray="4 2"/>
-    </svg>
-  );
-};
-
-// ─── BAR CHART ───────────────────────────────────────────────────────────────
-const BarChart = ({ data = [], labelKey, valueKey, color="#60a5fa", height=120 }) => {
-  if (!data.length) return <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:11 }}>No data</div>;
-  const max = Math.max(...data.map(d => d[valueKey]||0), 1);
-  return (
-    <div style={{ display:"flex", alignItems:"flex-end", gap:3, height, padding:"0 4px" }}>
-      {data.map((d,i) => (
-        <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3, height:"100%" }}>
-          <div style={{ flex:1, display:"flex", alignItems:"flex-end", width:"100%" }}>
-            <div style={{ width:"100%", background:color, borderRadius:"2px 2px 0 0", height:`${((d[valueKey]||0)/max)*100}%`, minHeight:2, opacity:0.85 }}/>
-          </div>
-          <span style={{ fontSize:9, color:"#5a5a80", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%", textAlign:"center" }}>{d[labelKey]}</span>
-        </div>
-      ))}
+      {/* Ticket detail panel */}
+      {selectedTicket && (
+        <TicketDetailPanel ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
+      )}
     </div>
   );
 };
@@ -1300,7 +1410,6 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("30");
-  const [analyticsTab, setAnalyticsTab] = useState("revenue");
   const targetNode = selectedNode || nodes[0];
 
   useEffect(() => {
@@ -1321,50 +1430,21 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   );
 
   const ov = data?.overview || {};
-  const services = data?.services || [];
-  const workers = data?.workers || [];
-  const daily = data?.daily || [];
-
-  // Build weekly by-day data (mock structure for UI — backend fills real data)
-  const weekdays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-  const hours = Array.from({length:24},(_,i)=>({ label:`${String(i).padStart(2,"0")}:00`, tickets: data?.hourly?.[i] || 0 }));
-  const byDay = weekdays.map((label,i) => ({ label, tickets: data?.weekday?.[i] || 0 }));
-
-  const topCustomersRev = data?.top_customers || [];
-  const topCustomersPaid = data?.top_customers_paid || topCustomersRev;
-
-  const StatCard = ({ label, value, color, bg, icon }) => (
-    <div style={{ flex:1, background:bg||color+"22", border:`1px solid ${color}44`, borderRadius:10, padding:"18px 22px", position:"relative", overflow:"hidden", minWidth:0 }}>
-      <div style={{ position:"absolute", right:16, top:12, fontSize:40, opacity:0.12 }}>{icon}</div>
-      <div style={{ fontSize:9, color:color+"cc", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>{label}</div>
-      <div style={{ fontSize:32, fontWeight:900, color, lineHeight:1 }}>{value}</div>
-    </div>
-  );
-
-  const BadgeTd = ({ value, color }) => (
-    <td style={{ padding:"6px 10px" }}>
-      <span style={{ background:color+"22", color, border:`1px solid ${color}44`, borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:700 }}>{value}</span>
-    </td>
-  );
 
   return (
-    <div style={{ height:"100%", overflow:"auto" }}>
-      {/* Sticky header */}
-      <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, background:"#0d0d12", zIndex:10, flexWrap:"wrap" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontSize:12, color:"#a78bfa", fontWeight:600 }}>
-          📅 {period === "7" ? "Last 7 days" : period === "30" ? "Last 30 days" : "Last 90 days"}
-          <select value={period} onChange={e => setPeriod(e.target.value)}
-            style={{ position:"absolute", opacity:0, cursor:"pointer", width:120 }}>
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
+    <div style={{ height:"100%", overflow:"auto", margin:"-28px -32px" }}>
+      {/* Header */}
+      <div style={{ padding:"12px 24px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0d0d12", zIndex:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:13, color:"#6060a0" }}>Analytics for</span>
+          <span style={{ fontWeight:700, fontSize:14 }}>{targetNode.name}</span>
         </div>
-        <span style={{ fontSize:12, color:"#5a5a80" }}>compared to previous period</span>
-        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:11, color:"#5a5a80" }}>Showing results from {nodes.length} bots</span>
-          <button style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:6, padding:"4px 10px", color:"#6060a0", cursor:"pointer", fontSize:12 }}>≡</button>
-        </div>
+        <select value={period} onChange={e => setPeriod(e.target.value)}
+          style={{ ...S.input, width:"auto", padding:"4px 10px", fontSize:12 }}>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
       </div>
 
       {loading ? (
@@ -1372,214 +1452,121 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
           <Spinner/> Loading analytics...
         </div>
       ) : (
-        <div style={{ padding:"20px 22px" }}>
-
-          {/* ── SECTION 1: Top KPI cards ── */}
-          <div style={{ fontSize:11, color:"#5a5a80", fontWeight:600, marginBottom:8 }}>Analytics</div>
-          <div style={{ fontSize:12, color:"#4a4a70", marginBottom:16 }}>View your analytics and statistics for your bots and webapps.</div>
-          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
-            <StatCard label="Paid Tickets" value={`# ${ov.paid_tickets||0}`} color="#60a5fa" icon="#"/>
-            <StatCard label="Revenue" value={`$ ${parseFloat(ov.total_revenue||0).toFixed(2)}`} color="#34d398" icon="$"/>
-            <StatCard label="Profits" value={`$ ${parseFloat(ov.total_profit||0).toFixed(2)}`} color="#f59e0b" icon="$"/>
-          </div>
-
-          {/* ── SECTION 2: Revenue/Profits chart + tab toggle ── */}
-          <div style={{ ...S.card, marginBottom:20 }}>
-            <div style={{ padding:"10px 18px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:2 }}>
-              {[["revenue","📈 Revenue/Profits"],["tickets","🎫 Tickets"],["platform","🌐 Platform"]].map(([id,label]) => (
-                <button key={id} onClick={() => setAnalyticsTab(id)}
-                  style={{ background:"transparent", border:"none", padding:"4px 14px", fontSize:12, fontWeight:analyticsTab===id?700:400,
-                    color:analyticsTab===id?"#a78bfa":"#6060a0", cursor:"pointer", borderBottom:analyticsTab===id?"2px solid #a78bfa":"2px solid transparent", marginBottom:-1 }}>
-                  {label}
-                </button>
-              ))}
-              <div style={{ marginLeft:"auto", fontSize:12, color:"#6060a0" }}>Daily ▾</div>
-              <div style={{ marginLeft:16, fontSize:14, fontWeight:800, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</div>
-            </div>
-            <div style={{ padding:"4px 18px 12px" }}>
-              <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600, marginBottom:4, padding:"8px 0 0" }}>Revenue/Profits</div>
-              <DualLineChart data={daily} height={180}/>
-              <div style={{ display:"flex", gap:16, justifyContent:"flex-end", fontSize:11, color:"#6060a0", marginTop:6 }}>
-                <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:16, height:2, background:"#60a5fa", display:"inline-block" }}/> Revenue</span>
-                <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:16, height:2, background:"#34d398", display:"inline-block", borderTop:"2px dashed #34d398", borderBottom:"none", height:0 }}/> Profits</span>
+        <div style={{ padding:"24px" }}>
+          {/* Top stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:24 }}>
+            {[
+              { label:"TOTAL TICKETS", value:`${ov.total_tickets||0}`, color:"#60a5fa", icon:"🎫" },
+              { label:"TOTAL REVENUE", value:`$${parseFloat(ov.total_revenue||0).toFixed(2)}`, color:"#34d398", icon:"💰" },
+              { label:"PAID TICKETS", value:`${ov.paid_tickets||0}`, color:"#f59e0b", icon:"✅" },
+            ].map((s,i) => (
+              <div key={i} style={{ ...S.card, padding:"20px 24px", position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", right:16, top:16, fontSize:32, opacity:0.1 }}>{s.icon}</div>
+                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+                <div style={{ fontSize:30, fontWeight:900, color:s.color }}>{s.value}</div>
               </div>
+            ))}
+          </div>
+
+          {/* Revenue chart */}
+          <div style={{ ...S.card, marginBottom:24 }}>
+            <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <span style={{ fontWeight:700, fontSize:13 }}>Revenue over time</span>
+              <span style={{ fontSize:16, fontWeight:900, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</span>
+            </div>
+            <div style={{ padding:"16px 20px" }}>
+              <MiniChart data={data?.daily||[]} color="#60a5fa" valueKey="revenue"/>
+              {!data?.daily?.length && <div style={{ textAlign:"center", color:"#4040a0", fontSize:13, marginTop:8 }}>No data for this period.</div>}
             </div>
           </div>
 
-          {/* ── SECTION 3: Services + Contractors side by side ── */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
+          {/* Services + Workers */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:24 }}>
             {/* Services */}
             <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontWeight:700, fontSize:13 }}>🛎 Services</span>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16 }}>⋯</button>
-              </div>
-              <div>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                      <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>SERVICE</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!services.length ? (
-                      <tr><td colSpan={4} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No service data yet.</td></tr>
-                    ) : services.map((s,i) => (
-                      <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                        onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <td style={{ padding:"6px 12px" }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <span style={{ width:16, height:16, borderRadius:3, background:"#1e1e3a", display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:9 }}>🛎</span>
-                            <span style={{ fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{s.service_name}</span>
-                          </div>
-                        </td>
-                        <BadgeTd value={`# ${s.tickets}`} color="#60a5fa"/>
-                        <BadgeTd value={`$ ${parseFloat(s.revenue).toFixed(2)}`} color="#34d398"/>
-                        <BadgeTd value={`$ ${parseFloat(s.profit||0).toFixed(2)}`} color="#f59e0b"/>
+              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>🛎 Top Services</div>
+              {!data?.services?.length ? (
+                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No service data yet.</div>
+              ) : (
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                        {["Service","Tickets","Revenue"].map(h => (
+                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {data.services.map((s,i) => (
+                        <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
+                          <td style={{ padding:"8px 12px", fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{s.service_name}</td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{s.tickets}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(s.revenue).toFixed(2)}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
-            {/* Contractors / Workers */}
+            {/* Workers */}
             <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontWeight:700, fontSize:13 }}>👤 Contractors</span>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16 }}>⋯</button>
-              </div>
-              <div>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                      <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CONTRACTOR</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUT</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                      <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!workers.length ? (
-                      <tr><td colSpan={5} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No worker data yet.</td></tr>
-                    ) : workers.map((w,i) => (
-                      <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                        onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <td style={{ padding:"6px 12px", fontSize:11 }}>{w.username}</td>
-                        <BadgeTd value={`% ${w.cut_percentage||0}`} color="#e05050"/>
-                        <BadgeTd value={`# ${w.tickets}`} color="#60a5fa"/>
-                        <BadgeTd value={`$ ${parseFloat(w.revenue).toFixed(2)}`} color="#34d398"/>
-                        <BadgeTd value={`$ ${parseFloat(w.profit||(w.revenue*(w.cut_percentage||0)/100)).toFixed(2)}`} color="#f59e0b"/>
+              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>👥 Workers</div>
+              {!data?.workers?.length ? (
+                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No worker data yet.</div>
+              ) : (
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                        {["Worker","Tickets","Revenue","Cut"].map(h => (
+                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {data.workers.map((w,i) => (
+                        <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
+                          <td style={{ padding:"8px 12px", fontSize:12 }}>{w.username}</td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{w.tickets}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(w.revenue).toFixed(2)}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>
+                              ${(parseFloat(w.revenue) * (w.cut_percentage||0) / 100).toFixed(2)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* ── SECTION 4: Returning / Avg Revenue / Retention ── */}
-          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
-            <StatCard label="Returning Customers" value={`# ${ov.returning_customers||ov.unique_customers||0}`} color="#e05050" icon="↩"/>
-            <StatCard label="Average Revenue / Customer" value={`$ ${ov.unique_customers ? ((ov.total_revenue||0)/ov.unique_customers).toFixed(0) : "0"}`} color="#f87171" icon="$"/>
-            <StatCard label="Customer Retention Rate" value={`% ${ov.retention_rate || (ov.paid_tickets&&ov.total_tickets ? ((ov.paid_tickets/ov.total_tickets)*100).toFixed(0) : "0")}`} color="#c084fc" icon="%"/>
+          {/* Bottom stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16 }}>
+            {[
+              { label:"UNIQUE CUSTOMERS", value:`${ov.unique_customers||0}`, color:"#e05050" },
+              { label:"AVG REVENUE / CUSTOMER", value:`$${ov.unique_customers ? ((ov.total_revenue||0)/ov.unique_customers).toFixed(2) : "0.00"}`, color:"#f87171" },
+              { label:"COMPLETION RATE", value:`${ov.paid_tickets&&ov.total_tickets ? (((ov.paid_tickets/ov.total_tickets)*100).toFixed(0)) : "0"}%`, color:"#c084fc" },
+            ].map((s,i) => (
+              <div key={i} style={{ ...S.card, padding:"16px 20px" }}>
+                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+                <div style={{ fontSize:26, fontWeight:900, color:s.color }}>{s.value}</div>
+              </div>
+            ))}
           </div>
-
-          {/* ── SECTION 5: Weekly Ticket Averages bar charts ── */}
-          <div style={{ ...S.card, marginBottom:20 }}>
-            <div style={{ padding:"12px 18px", borderBottom:"1px solid #1e1e2e" }}>
-              <div style={{ fontWeight:700, fontSize:13, marginBottom:4 }}>Weekly Ticket Averages</div>
-              <div style={{ fontSize:11, color:"#5a5a80" }}>These charts show the average number of tickets created per weekday and per hour of the day. This can help you identify trends in ticket creation and peak times for support requests.</div>
-            </div>
-            <div style={{ padding:"16px 18px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 }}>
-              <div>
-                <div style={{ fontSize:10, color:"#6060a0", fontWeight:600, marginBottom:10 }}>BY DAY OF WEEK</div>
-                <BarChart data={byDay} labelKey="label" valueKey="tickets" color="#60a5fa" height={120}/>
-              </div>
-              <div>
-                <div style={{ fontSize:10, color:"#6060a0", fontWeight:600, marginBottom:10 }}>BY HOUR OF DAY</div>
-                <BarChart data={hours} labelKey="label" valueKey="tickets" color="#a78bfa" height={120}/>
-              </div>
-            </div>
-          </div>
-
-          {/* ── SECTION 6: Top Customers tables ── */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-            {/* Top by Revenue */}
-            <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:11 }}>💰</span>
-                <span style={{ fontWeight:700, fontSize:13 }}>Top Customers (Revenue)</span>
-                <button style={{ marginLeft:"auto", background:"transparent", border:"1px solid #2a2a3e", borderRadius:6, padding:"2px 10px", color:"#6060a0", cursor:"pointer", fontSize:11 }}>📊 Graph</button>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:14 }}>⋯</button>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                    <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TOP CUSTOMERS (REVENUE)</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!topCustomersRev.length ? (
-                    <tr><td colSpan={3} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No data yet.</td></tr>
-                  ) : topCustomersRev.slice(0,10).map((c,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"6px 12px", fontSize:11, color:"#60a5fa" }}>
-                        {c.username ? `@${c.username}` : c.display_name || "Unknown"}
-                      </td>
-                      <BadgeTd value={`# ${c.tickets||c.total_tickets||0}`} color="#60a5fa"/>
-                      <BadgeTd value={`$ ${parseFloat(c.revenue||c.total_revenue||0).toFixed(2)}`} color="#34d398"/>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Top by Paid Tickets */}
-            <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:11 }}>🎫</span>
-                <span style={{ fontWeight:700, fontSize:13 }}>Top Customers (Paid Tickets)</span>
-                <button style={{ marginLeft:"auto", background:"transparent", border:"1px solid #2a2a3e", borderRadius:6, padding:"2px 10px", color:"#6060a0", cursor:"pointer", fontSize:11 }}>📊 Graph</button>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:14 }}>⋯</button>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                    <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TOP CUSTOMERS (PAID TICKETS)</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!topCustomersPaid.length ? (
-                    <tr><td colSpan={3} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No data yet.</td></tr>
-                  ) : topCustomersPaid.slice(0,10).map((c,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"6px 12px", fontSize:11, color:"#60a5fa" }}>
-                        {c.username ? `@${c.username}` : c.display_name || "Unknown"}
-                      </td>
-                      <BadgeTd value={`# ${c.tickets||c.paid_tickets||0}`} color="#60a5fa"/>
-                      <BadgeTd value={`$ ${parseFloat(c.revenue||c.total_revenue||0).toFixed(2)}`} color="#34d398"/>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
         </div>
       )}
     </div>
