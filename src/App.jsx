@@ -1080,7 +1080,7 @@ const TicketsPage = ({ selectedNode }) => {
   ];
 
   return (
-    <div style={{ display:"flex", height:"100%", margin:"-28px -32px", overflow:"hidden" }}>
+    <div style={{ display:"flex", height:"100%", overflow:"hidden" }}>
       {/* Left filter sidebar */}
       <div style={{ width:150, background:"#13131a", borderRight:"1px solid #1e1e2e", padding:"10px 6px", flexShrink:0, display:"flex", flexDirection:"column", gap:2 }}>
         <div style={{ fontSize:9, color:"#3a3a5a", textTransform:"uppercase", letterSpacing:1.2, marginBottom:8, padding:"0 8px" }}>
@@ -1348,7 +1348,7 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   );
 
   return (
-    <div style={{ height:"100%", overflow:"auto", margin:"-28px -32px" }}>
+    <div style={{ height:"100%", overflow:"auto" }}>
       {/* Sticky header */}
       <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, background:"#0d0d12", zIndex:10, flexWrap:"wrap" }}>
         <div style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontSize:12, color:"#a78bfa", fontWeight:600 }}>
@@ -1412,7 +1412,7 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
             <div style={S.card}>
               <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <span style={{ fontWeight:700, fontSize:13 }}>🛎 Services</span>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16 }}>⋯</button>
+                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16" }}>⋯</button>
               </div>
               <div>
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
