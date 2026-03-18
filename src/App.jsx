@@ -720,6 +720,24 @@ const TelegramSettingsTab = ({ node }) => {
                   <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Welcome message</div>
                   <textarea value={c.message_content||""} onChange={e => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_content:e.target.value}:cmd))}
                     style={{ ...S.input, minHeight:60, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="Message shown when customer uses this command..."/>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Command image (sent before message)</div>
+                  {c.message_image && (
+                    <div style={{ marginBottom:8, position:"relative", display:"inline-block" }}>
+                      <img src={c.message_image} alt="Command" style={{ maxWidth:180, maxHeight:120, borderRadius:8, border:"1px solid #2a2a3e", display:"block" }}/>
+                      <button onClick={() => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_image:null}:cmd))}
+                        style={{ position:"absolute", top:-6, right:-6, background:"#e05050", border:"none", borderRadius:"50%", width:20, height:20, color:"#fff", cursor:"pointer", fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>✕</button>
+                    </div>
+                  )}
+                  <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", background:"#1a1a28", border:"1px dashed #2a2a3e", borderRadius:8, padding:"8px 14px", fontSize:12, color:"#6060a0", marginBottom:10, width:"fit-content" }}>
+                    📷 {c.message_image ? "Change image" : "Upload image"}
+                    <input type="file" accept="image/*" style={{ display:"none" }} onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_image:ev.target.result}:cmd));
+                      reader.readAsDataURL(file);
+                    }}/>
+                  </label>
                   {c.cmd === '/start' && (
                     <>
                       <div style={{ fontSize:11, color:"#6060a0", marginBottom:8, fontWeight:600 }}>Attached services — click to toggle, drag to reorder (2 per row in bot)</div>
