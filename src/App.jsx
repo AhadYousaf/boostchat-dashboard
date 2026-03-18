@@ -601,345 +601,6 @@ const NodesPage = ({ nodes, nodesLoading, refreshNodes, setSelectedNode, setPage
   );
 };
 
-
-// ─── REVOLT SETTINGS TAB (kept) ─────────────────────────────────────────────
-// ─── REVOLT SETTINGS TAB ────────────────────────────────────────────────────
-const RevoltSettingsTab = ({ node }) => {
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [fetchingCategories, setFetchingCategories] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [revoltGuildId, setRevoltGuildId] = useState("");
-  const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [expandedService, setExpandedService] = useState(null);
-  const [serviceCategories, setServiceCategories] = useState({});
-  const [ticketNaming, setTicketNaming] = useState({});
-  const [enforcedClaiming, setEnforcedClaiming] = useState({});
-  const [serviceStatus, setServiceStatus] = useState({});
-
-  useEffect(() => { loadSettings(); }, [node.id]);
-
-  useEffect(() => {
-    if (revoltGuildId && revoltGuildId.length > 5) {
-      fetchCategories(revoltGuildId);
-    }
-  }, [revoltGuildId]);
-
-  const loadSettings = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await api(`/nodes/${node.id}/settings`);
-      const loadedServices = data.services || [];
-      setServices(loadedServices);
-
-      const config = data.config || {};
-      setRevoltGuildId(config.revolt_guild_id || "");
-
-      const cats = {};
-      const naming = {};
-      const claiming = {};
-      const status = {};
-
-      loadedServices.forEach(service => {
-        cats[service.id] = {
-          open: service.open_category || "",
-          claimed: service.claimed_category || "",
-          closed: service.closed_category || ""
-        };
-        naming[service.id] = {
-          opened: service.ticket_opened_format || "ticket-{count}",
-          claimed: service.ticket_claimed_format || "claimed-{nickname}-{count}",
-          closed: service.ticket_closed_format || "closed-{count}"
-        };
-        claiming[service.id] = {
-          enabled: service.enforced_claiming_enabled || false,
-          maxTickets: service.max_claims_per_contractor || 0,
-          timeout: service.claim_timeout_seconds || 0
-        };
-        status[service.id] = {
-          isOpen: service.is_service_open !== false,
-          isQueueFull: service.is_queue_full || false,
-          isQueueOnBreak: service.is_queue_on_break || false
-        };
-      });
-
-      setServiceCategories(cats);
-      setTicketNaming(naming);
-      setEnforcedClaiming(claiming);
-      setServiceStatus(status);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCategories = async (guildId) => {
-    const id = guildId || revoltGuildId;
-    if (!id) return;
-    setFetchingCategories(true);
-    try {
-      const data = await api(`/nodes/${node.id}/revolt-categories?guild_id=${id}`);
-      const cats = (data.categories || []).map(cat => ({
-        id: cat.id,
-        name: cat.title || cat.name || cat.id
-      }));
-      setCategories(cats);
-    } catch (err) {
-      setError(err.message || "Failed to fetch categories");
-    } finally {
-      setFetchingCategories(false);
-    }
-  };
-
-  const saveSettings = async () => {
-    if (!revoltGuildId) { setError("Guild ID is required"); return; }
-    setSaving(true);
-    setError("");
-    setSuccess("");
-    try {
-      const updatedServices = services.map(s => ({
-        ...s,
-        // Store category ID (not name) for reliable routing
-        open_category: serviceCategories[s.id]?.open || "",
-        claimed_category: serviceCategories[s.id]?.claimed || "",
-        closed_category: serviceCategories[s.id]?.closed || "",
-        ticket_opened_format: ticketNaming[s.id]?.opened || "ticket-{count}",
-        ticket_claimed_format: ticketNaming[s.id]?.claimed || "claimed-{nickname}-{count}",
-        ticket_closed_format: ticketNaming[s.id]?.closed || "closed-{count}",
-        enforced_claiming_enabled: enforcedClaiming[s.id]?.enabled || false,
-        max_claims_per_contractor: enforcedClaiming[s.id]?.maxTickets || 0,
-        claim_timeout_seconds: enforcedClaiming[s.id]?.timeout || 0,
-        is_service_open: serviceStatus[s.id]?.isOpen !== false,
-        is_queue_full: serviceStatus[s.id]?.isQueueFull || false,
-        is_queue_on_break: serviceStatus[s.id]?.isQueueOnBreak || false
-      }));
-
-      await api(`/nodes/${node.id}/settings`, {
-        method: "PUT",
-        body: {
-          services: updatedServices,
-          revolt_guild_id: revoltGuildId
-        }
-      });
-
-      setSuccess("✅ Settings saved!");
-      setTimeout(() => setSuccess(""), 3000);
-      await loadSettings();
-    } catch (err) {
-      setError(err.message || "Failed to save settings");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Helper — find category name by ID for display
-  const getCatName = (id) => {
-    if (!id) return "";
-    const cat = categories.find(c => c.id === id);
-    return cat ? cat.name : id;
-  };
-
-  if (loading) return <div style={{ color: "#6060a0" }}>Loading settings...</div>;
-
-  return (
-    <div>
-      {error && (
-        <div style={{ background: "#e05050", color: "#fff", padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
-          ❌ {error}
-        </div>
-      )}
-      {success && (
-        <div style={{ background: "#34d398", color: "#fff", padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
-          {success}
-        </div>
-      )}
-
-      {/* Guild ID */}
-      <div style={{ ...S.card, marginBottom: 20 }}>
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#f87171" }}>⚡</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>Revolt Server Configuration</span>
-          {fetchingCategories && <span style={{ fontSize: 11, color: "#6060a0", marginLeft: "auto" }}>Loading categories...</span>}
-          {!fetchingCategories && categories.length > 0 && (
-            <span style={{ fontSize: 11, color: "#34d398", marginLeft: "auto" }}>✓ {categories.length} categories loaded</span>
-          )}
-        </div>
-        <div style={{ padding: "20px" }}>
-          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Guild ID</label>
-          <input
-            style={S.input}
-            value={revoltGuildId}
-            onChange={e => setRevoltGuildId(e.target.value)}
-            placeholder="Enter your Revolt server/guild ID..."
-          />
-          <div style={{ fontSize: 11, color: "#4040a0", marginTop: 4 }}>
-            Categories load automatically once a valid Guild ID is entered.
-          </div>
-        </div>
-      </div>
-
-      {/* Services */}
-      {services.length === 0 ? (
-        <div style={{ ...S.card, padding: 20, textAlign: "center", color: "#6060a0" }}>
-          No services created yet. Create services in the Telegram tab first.
-        </div>
-      ) : services.map(service => (
-        <div key={service.id} style={{ ...S.card, marginBottom: 12 }}>
-          <div
-            onClick={() => setExpandedService(expandedService === service.id ? null : service.id)}
-            style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", borderBottom: expandedService === service.id ? "1px solid #1e1e2e" : "none" }}
-          >
-            <span>{expandedService === service.id ? "▼" : "▶"}</span>
-            <span style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>{service.name}</span>
-            {serviceCategories[service.id]?.open ? (
-              <span style={{ fontSize: 11, color: "#34d398" }}>
-                ✓ {getCatName(serviceCategories[service.id].open)}
-              </span>
-            ) : (
-              <span style={{ fontSize: 11, color: "#f59e0b" }}>⚠ Not configured</span>
-            )}
-          </div>
-
-          {expandedService === service.id && (
-            <div style={{ padding: "20px" }}>
-
-              {/* Category Selection */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Category settings</div>
-                {categories.length === 0 && (
-                  <div style={{ fontSize: 12, color: "#f59e0b", marginBottom: 12 }}>
-                    ⚠ Enter a valid Guild ID above to load categories.
-                  </div>
-                )}
-                {[
-                  { key: "open", label: "Open category" },
-                  { key: "claimed", label: "Claimed category" },
-                  { key: "closed", label: "Closed category" }
-                ].map(({ key, label }) => (
-                  <div key={key} style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
-                    <select
-                      style={S.input}
-                      value={serviceCategories[service.id]?.[key] || ""}
-                      onChange={e => setServiceCategories({
-                        ...serviceCategories,
-                        [service.id]: { ...serviceCategories[service.id], [key]: e.target.value }
-                      })}
-                    >
-                      <option value="">Select category...</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-
-              {/* Ticket Naming */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Ticket naming</div>
-                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
-                  Options: {"{nickname}"} = contractor name, {"{count}"} = ticket number
-                </div>
-                {[
-                  { key: "opened", label: "Opened", placeholder: "ticket-{count}" },
-                  { key: "claimed", label: "Claimed", placeholder: "claimed-{nickname}-{count}" },
-                  { key: "closed", label: "Closed", placeholder: "closed-{count}" }
-                ].map(({ key, label, placeholder }) => (
-                  <div key={key} style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
-                    <input
-                      style={S.input}
-                      placeholder={placeholder}
-                      value={ticketNaming[service.id]?.[key] || ""}
-                      onChange={e => setTicketNaming({
-                        ...ticketNaming,
-                        [service.id]: { ...ticketNaming[service.id], [key]: e.target.value }
-                      })}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Enforced Claiming */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Enforced claiming</div>
-                <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
-                  <input
-                    type="checkbox"
-                    checked={enforcedClaiming[service.id]?.enabled || false}
-                    onChange={e => setEnforcedClaiming({
-                      ...enforcedClaiming,
-                      [service.id]: { ...enforcedClaiming[service.id], enabled: e.target.checked }
-                    })}
-                    style={{ marginRight: 8 }}
-                  />
-                  Enabled?
-                </label>
-                {[
-                  { key: "maxTickets", label: "Max tickets per contractor" },
-                  { key: "timeout", label: "Timeout (seconds)" }
-                ].map(({ key, label }) => (
-                  <div key={key} style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
-                    <input
-                      type="number"
-                      style={S.input}
-                      value={enforcedClaiming[service.id]?.[key] || 0}
-                      onChange={e => setEnforcedClaiming({
-                        ...enforcedClaiming,
-                        [service.id]: { ...enforcedClaiming[service.id], [key]: parseInt(e.target.value) || 0 }
-                      })}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Service Status */}
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Service status</div>
-                {[
-                  { key: "isOpen", label: "Service open?" },
-                  { key: "isQueueFull", label: "Queue full?" },
-                  { key: "isQueueOnBreak", label: "Queue on break?" }
-                ].map(({ key, label }) => (
-                  <label key={key} style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
-                    <input
-                      type="checkbox"
-                      checked={key === "isOpen" ? serviceStatus[service.id]?.isOpen !== false : serviceStatus[service.id]?.[key] || false}
-                      onChange={e => setServiceStatus({
-                        ...serviceStatus,
-                        [service.id]: { ...serviceStatus[service.id], [key]: e.target.checked }
-                      })}
-                      style={{ marginRight: 8 }}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-
-            </div>
-          )}
-        </div>
-      ))}
-
-      {/* Save Button */}
-      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-        <button onClick={saveSettings} disabled={saving} style={{ ...S.btn("#34d398"), fontSize: 13, padding: "10px 20px" }}>
-          {saving ? "💾 Saving..." : "✅ Save All Settings"}
-        </button>
-        <button onClick={loadSettings} style={{ ...S.btnOutline, fontSize: 13, padding: "10px 20px" }}>
-          ↻ Reload
-        </button>
-      </div>
-    </div>
-  );
-};
-
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
 const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
   const [tab, setTab] = useState("overview");
@@ -1100,6 +761,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
                 <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
                   Customize your Telegram bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your customers receive the best possible service.
                 </p>
+
                 {/* Commands */}
                 <div style={{ marginBottom:20 }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
@@ -1124,6 +786,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
                     <button onClick={() => { if(newCmd.cmd){ setCommands([...commands,newCmd]); setNewCmd({cmd:"",desc:""}); }}} style={S.btn()}>+ Add</button>
                   </div>
                 </div>
+
                 {/* Services */}
                 <div style={{ marginBottom:20 }}>
                   <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Services / Buttons</div>
@@ -1139,6 +802,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
                     <button onClick={() => { if(newService){ setServices([...services,newService]); setNewService(""); }}} style={S.btn()}>+ Add</button>
                   </div>
                 </div>
+
                 {/* Questions */}
                 <div style={{ marginBottom:20 }}>
                   <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Questions</div>
@@ -1154,6 +818,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
                     <button onClick={() => { if(newQuestion){ setQuestions([...questions,newQuestion]); setNewQuestion(""); }}} style={S.btn()}>+ Add</button>
                   </div>
                 </div>
+
                 {/* Misc */}
                 <div style={{ marginBottom:8 }}>
                   <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
@@ -1161,6 +826,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
                   <SettingRow icon="⌨" title="Internal commands" desc="Toggle whether you want your customers to have access to certain commands that we use internal." color="#60a5fa"/>
                   <SettingRow icon="🔑" title="API keys" desc="Some functionality on BoostChat is too expensive to run on your behalf. Add your own API keys here." color="#a78bfa"/>
                 </div>
+
                 <div style={{ marginTop:16 }}>
                   <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Announcements</div>
                   <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Announcements let you send messages with preset button URLs that can direct your customers straight to your bot.</div>
@@ -1173,9 +839,44 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
           {/* ── BOOSTCHAT ── */}
           {tab==="BoostChat" && (
             <div>
-              <RevoltSettingsTab node={node}/>
+              <SectionCard icon="⚡" title="BoostChat Settings" color="#f87171">
+                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>BoostChat bot customisation</h3>
+                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
+                  Configure your BoostChat bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your team delivers the best possible service.
+                </p>
+
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Bot customization</div>
+                  <SettingRow icon="🏷" title="Guild ID" desc="Change the BoostChat guild/server that we will listen to. This is where commands, messages, tickets and other data will be created." color="#a78bfa"/>
+                </div>
+
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Service ticket management</div>
+                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To effectively manage customer inquiries and responses, a ticket must be created every time a customer provides an answer. You need to designate a space where tickets will be generated.</div>
+                  {["5Guys","Uber Eats $50+","Chipotle","Door Dash 45% OFF","Dominos","Wing Stop","Panera"].map((s,i) => (
+                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:13 }}>{s}</span>
+                      <button style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>···</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Command permissions</div>
+                  <SettingRow icon="⊙" title="Default" desc="Change the permissions and availability of default commands. Default commands are the basics to the ticket tool system." color="#60a5fa"/>
+                  <SettingRow icon="🔧" title="Utility" desc="Change the permissions and availability of utility commands. Utility are more sensitive commands that help with other functionality on the bot." color="#f59e0b"/>
+                  <SettingRow icon="💰" title="Accounting" desc="Change the permissions and availability of accounting addon commands." color="#34d398"/>
+                </div>
+
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
+                  <SettingRow icon="✦" title="Bot message passthrough" desc="Want a bots message to passthrough to your customers? This can result in errors unless you know what you're doing." color="#f87171"/>
+                </div>
+              </SectionCard>
             </div>
           )}
+
+          {/* ── WEBAPP ── */}
           {tab==="Webapp" && (
             <div style={{ ...S.card, padding:"48px", textAlign:"center", color:"#4040a0" }}>
               <div style={{ fontSize:32, marginBottom:12 }}>🌐</div>
@@ -1253,123 +954,78 @@ const CustomersPage = ({ selectedNode }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 50;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedNode) params.append("node_id", selectedNode.id);
-      if (tab === "banned") params.append("banned", "true");
-      if (search) params.append("search", search);
-      params.append("page", page);
-      params.append("limit", limit);
-      const data = await api(`/customers?${params}`);
-      setCustomers(data.customers || []);
-      setTotal(data.total || 0);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  }, [selectedNode, tab, search, page]);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (selectedNode) params.append("node_id", selectedNode.id);
+        if (tab==="banned") params.append("banned","true");
+        const data = await api(`/customers?${params}`);
+        setCustomers(data.customers||[]);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    };
+    load();
+  }, [selectedNode, tab]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [tab, search, selectedNode]);
-
-  const totalPages = Math.ceil(total / limit);
+  const filtered = customers.filter(c =>
+    [c.username, c.display_name, c.telegram_id?.toString()].some(v => v?.toLowerCase().includes(search.toLowerCase()))
+  );
 
   return (
     <div>
       <h1 style={{ margin:"0 0 4px", fontSize:24, fontWeight:800 }}>Customers</h1>
-      <p style={{ margin:"0 0 20px", color:"#6060a0", fontSize:13 }}>
-        {selectedNode ? `Showing customers from node: ${selectedNode.name}` : "Showing all customers across all nodes."}
-      </p>
+      <p style={{ margin:"0 0 20px", color:"#6060a0", fontSize:13 }}>{selectedNode?`Showing customers from node: ${selectedNode.name}`:"Showing all customers across all nodes."}</p>
       <div style={S.card}>
-        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ display:"flex", gap:4 }}>
-            {[["all","All"],["banned","Banned"]].map(([id,label]) => (
-              <button key={id} onClick={() => setTab(id)}
-                style={{ padding:"6px 16px", borderRadius:8, border:"none",
-                  background:tab===id?"#6c4fd822":"transparent",
-                  color:tab===id?"#a78bfa":"#6060a0", cursor:"pointer", fontSize:13, fontWeight:tab===id?700:400 }}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <span style={{ fontSize:12, color:"#6060a0" }}>{total} total</span>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", gap:4 }}>
+          {[["all","All"],["paid","Paid"],["banned","Banned"]].map(([id,label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{ padding:"6px 16px", borderRadius:8, border:"none", background:tab===id?"#6c4fd822":"transparent", color:tab===id?"#a78bfa":"#6060a0", cursor:"pointer", fontSize:13, fontWeight:tab===id?700:400 }}>{label}</button>
+          ))}
         </div>
         <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ color:"#6060a0" }}>🔍</span>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search by username, name or Telegram ID..."
-            style={{ ...S.input, border:"none", background:"transparent", padding:"4px 0" }}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by username, name or ID..." style={{ ...S.input, border:"none", background:"transparent", padding:"4px 0" }}/>
         </div>
-        {loading
-          ? <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading...</div>
-          : customers.length === 0
-            ? <div style={{ padding:"32px", textAlign:"center", color:"#4040a0", fontSize:13 }}>No customers yet.</div>
-            : (
-              <div style={{ overflowX:"auto" }}>
-                <table style={{ width:"100%", borderCollapse:"collapse", minWidth:650 }}>
-                  <thead>
-                    <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                      {["Telegram ID","Username","Display Name","Tickets","Paid","Revenue"].map(h => (
-                        <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700, textTransform:"uppercase", letterSpacing:0.8 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers.map((c,i) => (
-                      <tr key={c.id}
-                        style={{ borderBottom:"1px solid #1a1a2a", background:i%2===0?"transparent":"#ffffff03" }}
-                        onMouseEnter={e => e.currentTarget.style.background="#1a1a28"}
-                        onMouseLeave={e => e.currentTarget.style.background=i%2===0?"transparent":"#ffffff03"}>
-                        <td style={{ padding:"10px 16px" }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <div style={{ width:28, height:28, borderRadius:7, background:"#6c4fd822", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>💬</div>
-                            <span style={{ fontSize:12, color:"#6060a0", fontFamily:"monospace" }}>{c.telegram_id}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding:"10px 16px", fontSize:13 }}>
-                          {c.username
-                            ? <span style={{ color:"#60a5fa" }}>⊙ {c.username}</span>
-                            : <span style={{ color:"#3a3a6a" }}>⊘ No username</span>}
-                        </td>
-                        <td style={{ padding:"10px 16px", fontSize:13 }}>{c.display_name || "—"}</td>
-                        <td style={{ padding:"10px 16px" }}>
-                          <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>
-                            # {c.total_tickets||0}
-                          </span>
-                        </td>
-                        <td style={{ padding:"10px 16px" }}>
-                          <span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>
-                            # {c.paid_tickets||0}
-                          </span>
-                        </td>
-                        <td style={{ padding:"10px 16px" }}>
-                          <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>
-                            $ {parseFloat(c.total_revenue||0).toFixed(2)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-        <div style={{ padding:"10px 20px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:12, color:"#6060a0" }}>
-          <span>Page {page} of {totalPages||1} · {total} customers</span>
-          <div style={{ display:"flex", gap:4 }}>
-            <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
-              style={{ ...S.btnOutline, padding:"4px 10px", fontSize:12, opacity:page===1?0.4:1 }}>‹ Prev</button>
-            <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page>=totalPages}
-              style={{ ...S.btnOutline, padding:"4px 10px", fontSize:12, opacity:page>=totalPages?0.4:1 }}>Next ›</button>
+        {loading ? <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading...</div>
+        : filtered.length===0 ? <div style={{ padding:"32px", textAlign:"center", color:"#4040a0", fontSize:13 }}>No customers yet. They'll appear here when they message your bot.</div>
+        : (
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
+              <thead>
+                <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                  {["Telegram ID","Username","Display Name","Tickets","Paid","Revenue",""].map(h => (
+                    <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700, textTransform:"uppercase", letterSpacing:0.8 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((c,i) => (
+                  <tr key={c.id} style={{ borderBottom:"1px solid #1a1a2a", background:i%2===0?"transparent":"#ffffff03" }}>
+                    <td style={{ padding:"10px 16px" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <div style={{ width:28, height:28, borderRadius:7, background:"#6c4fd822", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>💬</div>
+                        <span style={{ fontSize:12, color:"#6060a0" }}>{c.telegram_id}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding:"10px 16px", fontSize:13 }}>{c.username?<span style={{ color:"#60a5fa" }}>⊙ {c.username}</span>:<span style={{ color:"#4040a0" }}>⊘ No username</span>}</td>
+                    <td style={{ padding:"10px 16px", fontSize:13 }}>{c.display_name}</td>
+                    <td style={{ padding:"10px 16px" }}><span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}># {c.total_tickets||0}</span></td>
+                    <td style={{ padding:"10px 16px" }}><span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}># {c.paid_tickets||0}</span></td>
+                    <td style={{ padding:"10px 16px" }}><span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>$ {parseFloat(c.total_revenue||0).toFixed(2)}</span></td>
+                    <td style={{ padding:"10px 16px" }}><button style={{ ...S.btnOutline, fontSize:12 }}>View ▾</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
+
 // ─── TICKETS PAGE ─────────────────────────────────────────────────────────────
 // ─── TICKET DETAIL PANEL ─────────────────────────────────────────────────────
 const TicketDetailPanel = ({ ticket, onClose }) => {
@@ -1748,53 +1404,11 @@ const TicketsPage = ({ selectedNode }) => {
   );
 };
 
-// ─── DUAL LINE CHART (Revenue + Profits) ─────────────────────────────────────
-const DualLineChart = ({ data = [], height = 200 }) => {
-  if (!data.length) return <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:12 }}>No data yet</div>;
-  const maxRev = Math.max(...data.map(d => d.revenue || 0), 1);
-  const maxPro = Math.max(...data.map(d => d.profit || 0), 1);
-  const w = 800, h = height;
-  const revPts = data.map((d,i) => `${(i/(data.length-1||1))*w},${h-(d.revenue/maxRev)*(h-20)-10}`);
-  const proPts = data.map((d,i) => `${(i/(data.length-1||1))*w},${h-(d.profit/maxPro)*(h-20)-10}`);
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width:"100%", height }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.3"/>
-          <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.02"/>
-        </linearGradient>
-      </defs>
-      <polygon points={`0,${h} ${revPts.join(" ")} ${w},${h}`} fill="url(#revGrad)"/>
-      <polyline points={revPts.join(" ")} fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinejoin="round"/>
-      <polyline points={proPts.join(" ")} fill="none" stroke="#34d398" strokeWidth="2" strokeLinejoin="round" strokeDasharray="4 2"/>
-    </svg>
-  );
-};
-
-// ─── BAR CHART ───────────────────────────────────────────────────────────────
-const BarChart = ({ data = [], labelKey, valueKey, color="#60a5fa", height=120 }) => {
-  if (!data.length) return <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:11 }}>No data</div>;
-  const max = Math.max(...data.map(d => d[valueKey]||0), 1);
-  return (
-    <div style={{ display:"flex", alignItems:"flex-end", gap:3, height, padding:"0 4px" }}>
-      {data.map((d,i) => (
-        <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3, height:"100%" }}>
-          <div style={{ flex:1, display:"flex", alignItems:"flex-end", width:"100%" }}>
-            <div style={{ width:"100%", background:color, borderRadius:"2px 2px 0 0", height:`${((d[valueKey]||0)/max)*100}%`, minHeight:2, opacity:0.85 }}/>
-          </div>
-          <span style={{ fontSize:9, color:"#5a5a80", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%", textAlign:"center" }}>{d[labelKey]}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
 // ─── ANALYTICS PAGE ───────────────────────────────────────────────────────────
 const AnalyticsPage = ({ selectedNode, nodes }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("30");
-  const [analyticsTab, setAnalyticsTab] = useState("revenue");
   const targetNode = selectedNode || nodes[0];
 
   useEffect(() => {
@@ -1815,49 +1429,21 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   );
 
   const ov = data?.overview || {};
-  const services = data?.services || [];
-  const workers = data?.workers || [];
-  const daily = data?.daily || [];
-
-  const weekdays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-  const hours = Array.from({length:24},(_,i)=>({ label:`${String(i).padStart(2,"0")}:00`, tickets: data?.hourly?.[i] || 0 }));
-  const byDay = weekdays.map((label,i) => ({ label, tickets: data?.weekday?.[i] || 0 }));
-
-  const topCustomersRev = data?.top_customers || [];
-  const topCustomersPaid = data?.top_customers_paid || topCustomersRev;
-
-  const StatCard = ({ label, value, color, icon }) => (
-    <div style={{ flex:1, background:color+"22", border:`1px solid ${color}44`, borderRadius:10, padding:"18px 22px", position:"relative", overflow:"hidden", minWidth:0 }}>
-      <div style={{ position:"absolute", right:16, top:12, fontSize:40, opacity:0.12 }}>{icon}</div>
-      <div style={{ fontSize:9, color:color+"cc", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>{label}</div>
-      <div style={{ fontSize:32, fontWeight:900, color, lineHeight:1 }}>{value}</div>
-    </div>
-  );
-
-  const BadgeTd = ({ value, color }) => (
-    <td style={{ padding:"6px 10px" }}>
-      <span style={{ background:color+"22", color, border:`1px solid ${color}44`, borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:700 }}>{value}</span>
-    </td>
-  );
 
   return (
-    <div style={{ height:"100%", overflow:"auto" }}>
-      {/* Sticky header */}
-      <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, background:"#0d0d12", zIndex:10, flexWrap:"wrap" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontSize:12, color:"#a78bfa", fontWeight:600, position:"relative" }}>
-          📅 {period === "7" ? "Last 7 days" : period === "30" ? "Last 30 days" : "Last 90 days"}
-          <select value={period} onChange={e => setPeriod(e.target.value)}
-            style={{ position:"absolute", opacity:0, cursor:"pointer", width:"100%", height:"100%", top:0, left:0 }}>
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
+    <div style={{ height:"100%", overflow:"auto", margin:"-28px -32px" }}>
+      {/* Header */}
+      <div style={{ padding:"12px 24px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0d0d12", zIndex:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:13, color:"#6060a0" }}>Analytics for</span>
+          <span style={{ fontWeight:700, fontSize:14 }}>{targetNode.name}</span>
         </div>
-        <span style={{ fontSize:12, color:"#5a5a80" }}>compared to previous period</span>
-        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:11, color:"#5a5a80" }}>Showing results from {nodes.length} bots</span>
-          <button style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:6, padding:"4px 10px", color:"#6060a0", cursor:"pointer", fontSize:12 }}>≡</button>
-        </div>
+        <select value={period} onChange={e => setPeriod(e.target.value)}
+          style={{ ...S.input, width:"auto", padding:"4px 10px", fontSize:12 }}>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
       </div>
 
       {loading ? (
@@ -1865,206 +1451,121 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
           <Spinner/> Loading analytics...
         </div>
       ) : (
-        <div style={{ padding:"20px 22px" }}>
-
-          {/* SECTION 1: KPI cards */}
-          <div style={{ fontSize:11, color:"#5a5a80", fontWeight:600, marginBottom:8 }}>Analytics</div>
-          <div style={{ fontSize:12, color:"#4a4a70", marginBottom:16 }}>View your analytics and statistics for your bots and webapps.</div>
-          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
-            <StatCard label="Paid Tickets" value={`# ${ov.paid_tickets||0}`} color="#60a5fa" icon="#"/>
-            <StatCard label="Revenue" value={`$ ${parseFloat(ov.total_revenue||0).toFixed(2)}`} color="#34d398" icon="$"/>
-            <StatCard label="Profits" value={`$ ${parseFloat(ov.total_profit||0).toFixed(2)}`} color="#f59e0b" icon="$"/>
-          </div>
-
-          {/* SECTION 2: Revenue/Profits chart */}
-          <div style={{ ...S.card, marginBottom:20 }}>
-            <div style={{ padding:"10px 18px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:2 }}>
-              {[["revenue","📈 Revenue/Profits"],["tickets","🎫 Tickets"],["platform","🌐 Platform"]].map(([id,label]) => (
-                <button key={id} onClick={() => setAnalyticsTab(id)}
-                  style={{ background:"transparent", border:"none", padding:"4px 14px", fontSize:12, fontWeight:analyticsTab===id?700:400,
-                    color:analyticsTab===id?"#a78bfa":"#6060a0", cursor:"pointer", borderBottom:analyticsTab===id?"2px solid #a78bfa":"2px solid transparent", marginBottom:-1 }}>
-                  {label}
-                </button>
-              ))}
-              <div style={{ marginLeft:"auto", fontSize:12, color:"#6060a0" }}>Daily ▾</div>
-              <div style={{ marginLeft:16, fontSize:14, fontWeight:800, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</div>
-            </div>
-            <div style={{ padding:"4px 18px 12px" }}>
-              <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600, marginBottom:4, padding:"8px 0 0" }}>Revenue/Profits</div>
-              <DualLineChart data={daily} height={180}/>
-              <div style={{ display:"flex", gap:16, justifyContent:"flex-end", fontSize:11, color:"#6060a0", marginTop:6 }}>
-                <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:16, height:2, background:"#60a5fa", display:"inline-block" }}/> Revenue</span>
-                <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:16, height:2, background:"#34d398", display:"inline-block" }}/> Profits</span>
+        <div style={{ padding:"24px" }}>
+          {/* Top stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:24 }}>
+            {[
+              { label:"TOTAL TICKETS", value:`${ov.total_tickets||0}`, color:"#60a5fa", icon:"🎫" },
+              { label:"TOTAL REVENUE", value:`$${parseFloat(ov.total_revenue||0).toFixed(2)}`, color:"#34d398", icon:"💰" },
+              { label:"PAID TICKETS", value:`${ov.paid_tickets||0}`, color:"#f59e0b", icon:"✅" },
+            ].map((s,i) => (
+              <div key={i} style={{ ...S.card, padding:"20px 24px", position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", right:16, top:16, fontSize:32, opacity:0.1 }}>{s.icon}</div>
+                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+                <div style={{ fontSize:30, fontWeight:900, color:s.color }}>{s.value}</div>
               </div>
+            ))}
+          </div>
+
+          {/* Revenue chart */}
+          <div style={{ ...S.card, marginBottom:24 }}>
+            <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <span style={{ fontWeight:700, fontSize:13 }}>Revenue over time</span>
+              <span style={{ fontSize:16, fontWeight:900, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</span>
+            </div>
+            <div style={{ padding:"16px 20px" }}>
+              <MiniChart data={data?.daily||[]} color="#60a5fa" valueKey="revenue"/>
+              {!data?.daily?.length && <div style={{ textAlign:"center", color:"#4040a0", fontSize:13, marginTop:8 }}>No data for this period.</div>}
             </div>
           </div>
 
-          {/* SECTION 3: Services + Contractors */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
+          {/* Services + Workers */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:24 }}>
+            {/* Services */}
             <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontWeight:700, fontSize:13 }}>🛎 Services</span>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16 }}>⋯</button>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                    <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>SERVICE</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!services.length ? (
-                    <tr><td colSpan={4} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No service data yet.</td></tr>
-                  ) : services.map((s,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"6px 12px" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span style={{ width:16, height:16, borderRadius:3, background:"#1e1e3a", display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:9 }}>🛎</span>
-                          <span style={{ fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{s.service_name}</span>
-                        </div>
-                      </td>
-                      <BadgeTd value={`# ${s.tickets}`} color="#60a5fa"/>
-                      <BadgeTd value={`$ ${parseFloat(s.revenue).toFixed(2)}`} color="#34d398"/>
-                      <BadgeTd value={`$ ${parseFloat(s.profit||0).toFixed(2)}`} color="#f59e0b"/>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>🛎 Top Services</div>
+              {!data?.services?.length ? (
+                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No service data yet.</div>
+              ) : (
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                        {["Service","Tickets","Revenue"].map(h => (
+                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.services.map((s,i) => (
+                        <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
+                          <td style={{ padding:"8px 12px", fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{s.service_name}</td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{s.tickets}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(s.revenue).toFixed(2)}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
+            {/* Workers */}
             <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontWeight:700, fontSize:13 }}>👤 Contractors</span>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:16 }}>⋯</button>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                    <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CONTRACTOR</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUT</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!workers.length ? (
-                    <tr><td colSpan={5} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No worker data yet.</td></tr>
-                  ) : workers.map((w,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"6px 12px", fontSize:11 }}>{w.username}</td>
-                      <BadgeTd value={`% ${w.cut_percentage||0}`} color="#e05050"/>
-                      <BadgeTd value={`# ${w.tickets}`} color="#60a5fa"/>
-                      <BadgeTd value={`$ ${parseFloat(w.revenue).toFixed(2)}`} color="#34d398"/>
-                      <BadgeTd value={`$ ${parseFloat(w.profit||(w.revenue*(w.cut_percentage||0)/100)).toFixed(2)}`} color="#f59e0b"/>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>👥 Workers</div>
+              {!data?.workers?.length ? (
+                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No worker data yet.</div>
+              ) : (
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                        {["Worker","Tickets","Revenue","Cut"].map(h => (
+                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.workers.map((w,i) => (
+                        <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
+                          <td style={{ padding:"8px 12px", fontSize:12 }}>{w.username}</td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{w.tickets}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(w.revenue).toFixed(2)}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>
+                              ${(parseFloat(w.revenue) * (w.cut_percentage||0) / 100).toFixed(2)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* SECTION 4: Returning / Avg Revenue / Retention */}
-          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
-            <StatCard label="Returning Customers" value={`# ${ov.returning_customers||ov.unique_customers||0}`} color="#e05050" icon="↩"/>
-            <StatCard label="Average Revenue / Customer" value={`$ ${ov.unique_customers ? ((ov.total_revenue||0)/ov.unique_customers).toFixed(0) : "0"}`} color="#f87171" icon="$"/>
-            <StatCard label="Customer Retention Rate" value={`% ${ov.retention_rate || (ov.paid_tickets&&ov.total_tickets ? ((ov.paid_tickets/ov.total_tickets)*100).toFixed(0) : "0")}`} color="#c084fc" icon="%"/>
+          {/* Bottom stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16 }}>
+            {[
+              { label:"UNIQUE CUSTOMERS", value:`${ov.unique_customers||0}`, color:"#e05050" },
+              { label:"AVG REVENUE / CUSTOMER", value:`$${ov.unique_customers ? ((ov.total_revenue||0)/ov.unique_customers).toFixed(2) : "0.00"}`, color:"#f87171" },
+              { label:"COMPLETION RATE", value:`${ov.paid_tickets&&ov.total_tickets ? (((ov.paid_tickets/ov.total_tickets)*100).toFixed(0)) : "0"}%`, color:"#c084fc" },
+            ].map((s,i) => (
+              <div key={i} style={{ ...S.card, padding:"16px 20px" }}>
+                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+                <div style={{ fontSize:26, fontWeight:900, color:s.color }}>{s.value}</div>
+              </div>
+            ))}
           </div>
-
-          {/* SECTION 5: Weekly Ticket Averages */}
-          <div style={{ ...S.card, marginBottom:20 }}>
-            <div style={{ padding:"12px 18px", borderBottom:"1px solid #1e1e2e" }}>
-              <div style={{ fontWeight:700, fontSize:13, marginBottom:4 }}>Weekly Ticket Averages</div>
-              <div style={{ fontSize:11, color:"#5a5a80" }}>These charts show the average number of tickets created per weekday and per hour of the day. This can help you identify trends in ticket creation and peak times for support requests.</div>
-            </div>
-            <div style={{ padding:"16px 18px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 }}>
-              <div>
-                <div style={{ fontSize:10, color:"#6060a0", fontWeight:600, marginBottom:10 }}>BY DAY OF WEEK</div>
-                <BarChart data={byDay} labelKey="label" valueKey="tickets" color="#60a5fa" height={120}/>
-              </div>
-              <div>
-                <div style={{ fontSize:10, color:"#6060a0", fontWeight:600, marginBottom:10 }}>BY HOUR OF DAY</div>
-                <BarChart data={hours} labelKey="label" valueKey="tickets" color="#a78bfa" height={120}/>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 6: Top Customers */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-            <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:11 }}>💰</span>
-                <span style={{ fontWeight:700, fontSize:13 }}>Top Customers (Revenue)</span>
-                <button style={{ marginLeft:"auto", background:"transparent", border:"1px solid #2a2a3e", borderRadius:6, padding:"2px 10px", color:"#6060a0", cursor:"pointer", fontSize:11 }}>📊 Graph</button>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:14 }}>⋯</button>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                    <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUSTOMER</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!topCustomersRev.length ? (
-                    <tr><td colSpan={3} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No data yet.</td></tr>
-                  ) : topCustomersRev.slice(0,10).map((c,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"6px 12px", fontSize:11, color:"#60a5fa" }}>
-                        {c.username ? `@${c.username}` : c.display_name || "Unknown"}
-                      </td>
-                      <BadgeTd value={`# ${c.tickets||c.total_tickets||0}`} color="#60a5fa"/>
-                      <BadgeTd value={`$ ${parseFloat(c.revenue||c.total_revenue||0).toFixed(2)}`} color="#34d398"/>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:11 }}>🎫</span>
-                <span style={{ fontWeight:700, fontSize:13 }}>Top Customers (Paid Tickets)</span>
-                <button style={{ marginLeft:"auto", background:"transparent", border:"1px solid #2a2a3e", borderRadius:6, padding:"2px 10px", color:"#6060a0", cursor:"pointer", fontSize:11 }}>📊 Graph</button>
-                <button style={{ background:"transparent", border:"none", color:"#5a5a80", cursor:"pointer", fontSize:14 }}>⋯</button>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                    <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUSTOMER</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                    <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!topCustomersPaid.length ? (
-                    <tr><td colSpan={3} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No data yet.</td></tr>
-                  ) : topCustomersPaid.slice(0,10).map((c,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#16161f"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"6px 12px", fontSize:11, color:"#60a5fa" }}>
-                        {c.username ? `@${c.username}` : c.display_name || "Unknown"}
-                      </td>
-                      <BadgeTd value={`# ${c.tickets||c.paid_tickets||0}`} color="#60a5fa"/>
-                      <BadgeTd value={`$ ${parseFloat(c.revenue||c.total_revenue||0).toFixed(2)}`} color="#34d398"/>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
         </div>
       )}
     </div>
