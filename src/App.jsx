@@ -750,11 +750,96 @@ const TelegramSettingsTab = ({ node }) => {
         </div>
       </div>
 
+      {/* ── SERVICES ── */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
+          <div style={{ fontWeight:700, fontSize:13, color:"#34d398" }}>Services</div>
+          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Services appear as buttons when customers use /start. Attach questions to each service.</div>
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {services.map((s, i) => (
+            <div key={s.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:13, fontWeight:600 }}>{s.name}</span>
+                <div style={{ display:"flex", gap:6 }}>
+                  <button onClick={() => setExpandedSvc(expandedSvc===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
+                    {expandedSvc===i?"▲":"···"}
+                  </button>
+                  <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                </div>
+              </div>
+              {expandedSvc===i && (
+                <div style={{ marginTop:10 }}>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Open message (shown when customer selects this service)</div>
+                  <textarea value={s.open_message_content||""} onChange={e => setServices(services.map((sv,j)=>j===i?{...sv,open_message_content:e.target.value}:sv))}
+                    style={{ ...S.input, minHeight:50, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="e.g. Thanks for choosing this service! Please answer the following questions..."/>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached questions — click to toggle, drag to reorder</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
+                    {questions.map(q => (
+                      <button key={q.id||q.question} onClick={() => toggleQuestionOnService(s.id||s.name, q.id)}
+                        style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
+                          borderColor:(s.attached_questions||[]).includes(q.id)?"#34d39844":"#2a2a3e",
+                          background:(s.attached_questions||[]).includes(q.id)?"#34d39822":"transparent",
+                          color:(s.attached_questions||[]).includes(q.id)?"#34d398":"#8080a0",
+                          cursor:"pointer", fontSize:11 }}>
+                        {(s.attached_questions||[]).includes(q.id)?"✓ ":"+ "}{q.question?.slice(0,28)}{(q.question?.length||0)>28?"...":""}
+                      </button>
+                    ))}
+                    {questions.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add questions below first</span>}
+                  </div>
+                  {(s.attached_questions||[]).length > 0 && (
+                    <>
+                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Question order (drag to rearrange)</div>
+                      {(s.attached_questions||[]).map((qId, idx) => {
+                        const q = questions.find(q => q.id === qId);
+                        if (!q) return null;
+                        return (
+                          <div key={qId}
+                            draggable
+                            onDragStart={e => { setDragQ(qId); e.dataTransfer.effectAllowed="move"; }}
+                            onDragOver={e => e.preventDefault()}
+                            onDrop={e => {
+                              e.preventDefault();
+                              if (!dragQ || dragQ===qId) return;
+                              setServices(services.map(sv => {
+                                if (sv.id !== s.id) return sv;
+                                const list = [...(sv.attached_questions||[])];
+                                const fi = list.indexOf(dragQ), ti = list.indexOf(qId);
+                                if (fi===-1||ti===-1) return sv;
+                                list.splice(fi,1); list.splice(ti,0,dragQ);
+                                return {...sv, attached_questions:list};
+                              }));
+                              setDragQ(null);
+                            }}
+                            style={{ background:"#12121f", border:`1px solid ${dragQ===qId?"#34d398":"#2a2a3e"}`,
+                              borderRadius:8, padding:"8px 12px", marginBottom:6, fontSize:12,
+                              cursor:"grab", display:"flex", alignItems:"center", gap:8, userSelect:"none",
+                              opacity: dragQ && dragQ!==qId ? 0.6 : 1 }}>
+                            <span style={{ color:"#4040a0", fontSize:14 }}>⠿</span>
+                            <span style={{ flex:1 }}>{q.question}</span>
+                            <span style={{ background:"#a78bfa22", color:"#a78bfa", border:"1px solid #a78bfa44", borderRadius:4, padding:"1px 6px", fontSize:10 }}>{q.question_type||"text"}</span>
+                            <span style={{ fontSize:10, color:"#4040a0" }}>#{idx+1}</span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:8, marginTop:8 }}>
+            <input style={{ ...S.input, flex:1 }} placeholder="Service name e.g. 🍔 5Guys" value={newService.name} onChange={e=>setNewService({...newService,name:e.target.value})}/>
+            <button onClick={addService} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
+          </div>
+        </div>
+      </div>
+
       {/* ── QUESTIONS ── */}
       <div style={{ ...S.card, marginBottom:16 }}>
         <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
           <div style={{ fontWeight:700, fontSize:13, color:"#a78bfa" }}>Questions</div>
-          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Create questions customers must answer when creating a ticket. Attach them to services below.</div>
+          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Create questions customers must answer when creating a ticket. Attach them to services above.</div>
         </div>
         <div style={{ padding:"16px 20px" }}>
           {questions.map((q, i) => (
@@ -814,54 +899,6 @@ const TelegramSettingsTab = ({ node }) => {
               <option value="inline_preset_buttons">Buttons</option>
             </select>
             <button onClick={addQuestion} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── SERVICES ── */}
-      <div style={{ ...S.card, marginBottom:16 }}>
-        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
-          <div style={{ fontWeight:700, fontSize:13, color:"#34d398" }}>Services</div>
-          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Services appear as buttons when customers use /start. Attach questions to each service.</div>
-        </div>
-        <div style={{ padding:"16px 20px" }}>
-          {services.map((s, i) => (
-            <div key={s.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8 }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontSize:13, fontWeight:600 }}>{s.name}</span>
-                <div style={{ display:"flex", gap:6 }}>
-                  <button onClick={() => setExpandedSvc(expandedSvc===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
-                    {expandedSvc===i?"▲":"···"}
-                  </button>
-                  <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
-                </div>
-              </div>
-              {expandedSvc===i && (
-                <div style={{ marginTop:10 }}>
-                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Open message (shown when customer selects this service)</div>
-                  <textarea value={s.open_message_content||""} onChange={e => setServices(services.map((sv,j)=>j===i?{...sv,open_message_content:e.target.value}:sv))}
-                    style={{ ...S.input, minHeight:50, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="e.g. Thanks for choosing this service! Please answer the following questions..."/>
-                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached questions (asked in order)</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {questions.map(q => (
-                      <button key={q.id||q.question} onClick={() => toggleQuestionOnService(s.id||s.name, q.id)}
-                        style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
-                          borderColor:(s.attached_questions||[]).includes(q.id)?"#34d39844":"#2a2a3e",
-                          background:(s.attached_questions||[]).includes(q.id)?"#34d39822":"transparent",
-                          color:(s.attached_questions||[]).includes(q.id)?"#34d398":"#8080a0",
-                          cursor:"pointer", fontSize:11 }}>
-                        {q.question?.slice(0,30)}{(q.question?.length||0)>30?"...":""}
-                      </button>
-                    ))}
-                    {questions.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add questions above first</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-          <div style={{ display:"flex", gap:8, marginTop:8 }}>
-            <input style={{ ...S.input, flex:1 }} placeholder="Service name e.g. 🍔 5Guys" value={newService.name} onChange={e=>setNewService({...newService,name:e.target.value})}/>
-            <button onClick={addService} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
           </div>
         </div>
       </div>
