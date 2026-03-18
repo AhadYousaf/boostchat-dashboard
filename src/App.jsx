@@ -601,6 +601,574 @@ const NodesPage = ({ nodes, nodesLoading, refreshNodes, setSelectedNode, setPage
   );
 };
 
+
+// ─── TELEGRAM SETTINGS TAB ───────────────────────────────────────────────────
+const TelegramSettingsTab = ({ node }) => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [commands, setCommands] = useState([]);
+  const [services, setServices] = useState([]);
+  const [questions, setQuestions] = useState([]);
+  const [newCmd, setNewCmd] = useState({ cmd:"", desc:"", message_content:"", attached_services:[] });
+  const [newService, setNewService] = useState({ name:"", open_message_content:"", attached_questions:[] });
+  const [newQuestion, setNewQuestion] = useState({ question:"", question_type:"text", options:[] });
+  const [expandedCmd, setExpandedCmd] = useState(null);
+  const [expandedSvc, setExpandedSvc] = useState(null);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const data = await api(`/nodes/${node.id}/settings`);
+      setCommands(data.commands || []);
+      setServices(data.services || []);
+      setQuestions(data.questions || []);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadSettings(); }, [node.id]);
+
+  const saveAll = async () => {
+    setSaving(true); setError(""); setSuccess("");
+    try {
+      await api(`/nodes/${node.id}/settings`, {
+        method: "PUT",
+        body: { commands, services, questions }
+      });
+      setSuccess("Settings saved!");
+      setTimeout(() => setSuccess(""), 3000);
+      await loadSettings();
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const addCommand = () => {
+    if (!newCmd.cmd) return;
+    setCommands([...commands, { ...newCmd, id: Date.now().toString() }]);
+    setNewCmd({ cmd:"", desc:"", message_content:"", attached_services:[] });
+  };
+
+  const addService = () => {
+    if (!newService.name) return;
+    setServices([...services, { ...newService, id: Date.now().toString() }]);
+    setNewService({ name:"", open_message_content:"", attached_questions:[] });
+  };
+
+  const addQuestion = () => {
+    if (!newQuestion.question) return;
+    setQuestions([...questions, { ...newQuestion, id: Date.now().toString() }]);
+    setNewQuestion({ question:"", question_type:"text", options:[] });
+  };
+
+  const toggleServiceOnCommand = (cmdId, svcName) => {
+    setCommands(commands.map(c => {
+      if (c.id !== cmdId && c.cmd !== cmdId) return c;
+      const attached = c.attached_services || [];
+      return { ...c, attached_services: attached.includes(svcName)
+        ? attached.filter(s => s !== svcName)
+        : [...attached, svcName] };
+    }));
+  };
+
+  const toggleQuestionOnService = (svcId, qId) => {
+    setServices(services.map(s => {
+      if (s.id !== svcId) return s;
+      const attached = s.attached_questions || [];
+      return { ...s, attached_questions: attached.includes(qId)
+        ? attached.filter(q => q !== qId)
+        : [...attached, qId] };
+    }));
+  };
+
+  if (loading) return <div style={{ padding:"32px", display:"flex", gap:12, color:"#6060a0" }}><Spinner size={14}/> Loading settings...</div>;
+
+  return (
+    <div>
+      {error && <div style={{ background:"#e0505022", border:"1px solid #e0505044", borderRadius:8, padding:"10px 14px", color:"#f87171", fontSize:13, marginBottom:16 }}>⚠ {error}</div>}
+      {success && <div style={{ background:"#34d39822", border:"1px solid #34d39844", borderRadius:8, padding:"10px 14px", color:"#34d398", fontSize:13, marginBottom:16 }}>✓ {success}</div>}
+
+      {/* ── COMMANDS ── */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div>
+            <div style={{ fontWeight:700, fontSize:13, color:"#60a5fa" }}>Commands</div>
+            <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Configure your bot commands. The /start command shows the service menu.</div>
+          </div>
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {commands.map((c, i) => (
+            <div key={c.id || i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:expandedCmd===i?8:0 }}>
+                <div>
+                  <span style={{ color:"#60a5fa", fontWeight:700, fontSize:13 }}>{c.cmd}</span>
+                  <span style={{ color:"#6060a0", fontSize:12, marginLeft:8 }}>{c.desc}</span>
+                </div>
+                <div style={{ display:"flex", gap:6 }}>
+                  <button onClick={() => setExpandedCmd(expandedCmd===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
+                    {expandedCmd===i?"▲":"▼"}
+                  </button>
+                  <button onClick={() => setCommands(commands.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                </div>
+              </div>
+              {expandedCmd===i && (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Welcome message</div>
+                  <textarea value={c.message_content||""} onChange={e => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_content:e.target.value}:cmd))}
+                    style={{ ...S.input, minHeight:60, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="Message shown when customer uses this command..."/>
+                  {c.cmd === '/start' && (
+                    <>
+                      <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached services (shown as buttons)</div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                        {services.map(s => (
+                          <button key={s.id||s.name} onClick={() => toggleServiceOnCommand(c.id||c.cmd, s.name)}
+                            style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
+                              borderColor:(c.attached_services||[]).includes(s.name)?"#60a5fa44":"#2a2a3e",
+                              background:(c.attached_services||[]).includes(s.name)?"#60a5fa22":"transparent",
+                              color:(c.attached_services||[]).includes(s.name)?"#60a5fa":"#8080a0",
+                              cursor:"pointer", fontSize:11 }}>
+                            {s.name}
+                          </button>
+                        ))}
+                        {services.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add services below first</span>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:8, marginTop:8 }}>
+            <input style={{ ...S.input, flex:"0 0 120px" }} placeholder="/command" value={newCmd.cmd} onChange={e=>setNewCmd({...newCmd,cmd:e.target.value})}/>
+            <input style={{ ...S.input, flex:1 }} placeholder="Description" value={newCmd.desc} onChange={e=>setNewCmd({...newCmd,desc:e.target.value})}/>
+            <button onClick={addCommand} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── QUESTIONS ── */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
+          <div style={{ fontWeight:700, fontSize:13, color:"#a78bfa" }}>Questions</div>
+          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Create questions customers must answer when creating a ticket. Attach them to services below.</div>
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {questions.map((q, i) => (
+            <div key={q.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div>
+                <span style={{ fontSize:13, color:"#e2e2f0" }}>{q.question}</span>
+                <span style={{ marginLeft:8, background:"#a78bfa22", color:"#a78bfa", border:"1px solid #a78bfa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{q.question_type||"text"}</span>
+              </div>
+              <button onClick={() => setQuestions(questions.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:8, marginTop:8 }}>
+            <input style={{ ...S.input, flex:1 }} placeholder="Question text e.g. What is your address?" value={newQuestion.question} onChange={e=>setNewQuestion({...newQuestion,question:e.target.value})}/>
+            <select style={{ ...S.input, flex:"0 0 130px" }} value={newQuestion.question_type} onChange={e=>setNewQuestion({...newQuestion,question_type:e.target.value})}>
+              <option value="text">Text</option>
+              <option value="photo">Photo</option>
+              <option value="number">Number</option>
+              <option value="inline_preset_buttons">Buttons</option>
+            </select>
+            <button onClick={addQuestion} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SERVICES ── */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e" }}>
+          <div style={{ fontWeight:700, fontSize:13, color:"#34d398" }}>Services</div>
+          <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Services appear as buttons when customers use /start. Attach questions to each service.</div>
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {services.map((s, i) => (
+            <div key={s.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:13, fontWeight:600 }}>{s.name}</span>
+                <div style={{ display:"flex", gap:6 }}>
+                  <button onClick={() => setExpandedSvc(expandedSvc===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
+                    {expandedSvc===i?"▲":"···"}
+                  </button>
+                  <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                </div>
+              </div>
+              {expandedSvc===i && (
+                <div style={{ marginTop:10 }}>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Open message (shown when customer selects this service)</div>
+                  <textarea value={s.open_message_content||""} onChange={e => setServices(services.map((sv,j)=>j===i?{...sv,open_message_content:e.target.value}:sv))}
+                    style={{ ...S.input, minHeight:50, resize:"vertical", fontSize:12, marginBottom:10 }} placeholder="e.g. Thanks for choosing this service! Please answer the following questions..."/>
+                  <div style={{ fontSize:11, color:"#6060a0", marginBottom:6, fontWeight:600 }}>Attached questions (asked in order)</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                    {questions.map(q => (
+                      <button key={q.id||q.question} onClick={() => toggleQuestionOnService(s.id||s.name, q.id)}
+                        style={{ padding:"3px 10px", borderRadius:6, border:"1px solid",
+                          borderColor:(s.attached_questions||[]).includes(q.id)?"#34d39844":"#2a2a3e",
+                          background:(s.attached_questions||[]).includes(q.id)?"#34d39822":"transparent",
+                          color:(s.attached_questions||[]).includes(q.id)?"#34d398":"#8080a0",
+                          cursor:"pointer", fontSize:11 }}>
+                        {q.question?.slice(0,30)}{(q.question?.length||0)>30?"...":""}
+                      </button>
+                    ))}
+                    {questions.length===0 && <span style={{ fontSize:11, color:"#4040a0" }}>Add questions above first</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{ display:"flex", gap:8, marginTop:8 }}>
+            <input style={{ ...S.input, flex:1 }} placeholder="Service name e.g. 🍔 5Guys" value={newService.name} onChange={e=>setNewService({...newService,name:e.target.value})}/>
+            <button onClick={addService} style={{ ...S.btn(), fontSize:12, whiteSpace:"nowrap" }}>+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Save button */}
+      <button onClick={saveAll} disabled={saving} style={{ ...S.btn(), fontSize:13, padding:"10px 24px" }}>
+        {saving ? <><Spinner size={14}/> Saving...</> : "💾 Save All Settings"}
+      </button>
+    </div>
+  );
+};
+
+// ─── REVOLT SETTINGS TAB ────────────────────────────────────────────────────
+const RevoltSettingsTab = ({ node }) => {
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fetchingCategories, setFetchingCategories] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [revoltGuildId, setRevoltGuildId] = useState("");
+  const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [expandedService, setExpandedService] = useState(null);
+  const [serviceCategories, setServiceCategories] = useState({});
+  const [ticketNaming, setTicketNaming] = useState({});
+  const [enforcedClaiming, setEnforcedClaiming] = useState({});
+  const [serviceStatus, setServiceStatus] = useState({});
+
+  useEffect(() => { loadSettings(); }, [node.id]);
+
+  useEffect(() => {
+    if (revoltGuildId && revoltGuildId.length > 5) {
+      fetchCategories(revoltGuildId);
+    }
+  }, [revoltGuildId]);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await api(`/nodes/${node.id}/settings`);
+      const loadedServices = data.services || [];
+      setServices(loadedServices);
+
+      const config = data.config || {};
+      setRevoltGuildId(config.revolt_guild_id || "");
+
+      const cats = {};
+      const naming = {};
+      const claiming = {};
+      const status = {};
+
+      loadedServices.forEach(service => {
+        cats[service.id] = {
+          open: service.open_category || "",
+          claimed: service.claimed_category || "",
+          closed: service.closed_category || ""
+        };
+        naming[service.id] = {
+          opened: service.ticket_opened_format || "ticket-{count}",
+          claimed: service.ticket_claimed_format || "claimed-{nickname}-{count}",
+          closed: service.ticket_closed_format || "closed-{count}"
+        };
+        claiming[service.id] = {
+          enabled: service.enforced_claiming_enabled || false,
+          maxTickets: service.max_claims_per_contractor || 0,
+          timeout: service.claim_timeout_seconds || 0
+        };
+        status[service.id] = {
+          isOpen: service.is_service_open !== false,
+          isQueueFull: service.is_queue_full || false,
+          isQueueOnBreak: service.is_queue_on_break || false
+        };
+      });
+
+      setServiceCategories(cats);
+      setTicketNaming(naming);
+      setEnforcedClaiming(claiming);
+      setServiceStatus(status);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async (guildId) => {
+    const id = guildId || revoltGuildId;
+    if (!id) return;
+    setFetchingCategories(true);
+    try {
+      const data = await api(`/nodes/${node.id}/revolt-categories?guild_id=${id}`);
+      const cats = (data.categories || []).map(cat => ({
+        id: cat.id,
+        name: cat.title || cat.name || cat.id
+      }));
+      setCategories(cats);
+    } catch (err) {
+      setError(err.message || "Failed to fetch categories");
+    } finally {
+      setFetchingCategories(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    if (!revoltGuildId) { setError("Guild ID is required"); return; }
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const updatedServices = services.map(s => ({
+        ...s,
+        // Store category ID (not name) for reliable routing
+        open_category: serviceCategories[s.id]?.open || "",
+        claimed_category: serviceCategories[s.id]?.claimed || "",
+        closed_category: serviceCategories[s.id]?.closed || "",
+        ticket_opened_format: ticketNaming[s.id]?.opened || "ticket-{count}",
+        ticket_claimed_format: ticketNaming[s.id]?.claimed || "claimed-{nickname}-{count}",
+        ticket_closed_format: ticketNaming[s.id]?.closed || "closed-{count}",
+        enforced_claiming_enabled: enforcedClaiming[s.id]?.enabled || false,
+        max_claims_per_contractor: enforcedClaiming[s.id]?.maxTickets || 0,
+        claim_timeout_seconds: enforcedClaiming[s.id]?.timeout || 0,
+        is_service_open: serviceStatus[s.id]?.isOpen !== false,
+        is_queue_full: serviceStatus[s.id]?.isQueueFull || false,
+        is_queue_on_break: serviceStatus[s.id]?.isQueueOnBreak || false
+      }));
+
+      await api(`/nodes/${node.id}/settings`, {
+        method: "PUT",
+        body: {
+          services: updatedServices,
+          revolt_guild_id: revoltGuildId
+        }
+      });
+
+      setSuccess("✅ Settings saved!");
+      setTimeout(() => setSuccess(""), 3000);
+      await loadSettings();
+    } catch (err) {
+      setError(err.message || "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Helper — find category name by ID for display
+  const getCatName = (id) => {
+    if (!id) return "";
+    const cat = categories.find(c => c.id === id);
+    return cat ? cat.name : id;
+  };
+
+  if (loading) return <div style={{ color: "#6060a0" }}>Loading settings...</div>;
+
+  return (
+    <div>
+      {error && (
+        <div style={{ background: "#e05050", color: "#fff", padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+          ❌ {error}
+        </div>
+      )}
+      {success && (
+        <div style={{ background: "#34d398", color: "#fff", padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+          {success}
+        </div>
+      )}
+
+      {/* Guild ID */}
+      <div style={{ ...S.card, marginBottom: 20 }}>
+        <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "#f87171" }}>⚡</span>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>Revolt Server Configuration</span>
+          {fetchingCategories && <span style={{ fontSize: 11, color: "#6060a0", marginLeft: "auto" }}>Loading categories...</span>}
+          {!fetchingCategories && categories.length > 0 && (
+            <span style={{ fontSize: 11, color: "#34d398", marginLeft: "auto" }}>✓ {categories.length} categories loaded</span>
+          )}
+        </div>
+        <div style={{ padding: "20px" }}>
+          <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 700 }}>Guild ID</label>
+          <input
+            style={S.input}
+            value={revoltGuildId}
+            onChange={e => setRevoltGuildId(e.target.value)}
+            placeholder="Enter your Revolt server/guild ID..."
+          />
+          <div style={{ fontSize: 11, color: "#4040a0", marginTop: 4 }}>
+            Categories load automatically once a valid Guild ID is entered.
+          </div>
+        </div>
+      </div>
+
+      {/* Services */}
+      {services.length === 0 ? (
+        <div style={{ ...S.card, padding: 20, textAlign: "center", color: "#6060a0" }}>
+          No services created yet. Create services in the Telegram tab first.
+        </div>
+      ) : services.map(service => (
+        <div key={service.id} style={{ ...S.card, marginBottom: 12 }}>
+          <div
+            onClick={() => setExpandedService(expandedService === service.id ? null : service.id)}
+            style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", borderBottom: expandedService === service.id ? "1px solid #1e1e2e" : "none" }}
+          >
+            <span>{expandedService === service.id ? "▼" : "▶"}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>{service.name}</span>
+            {serviceCategories[service.id]?.open ? (
+              <span style={{ fontSize: 11, color: "#34d398" }}>
+                ✓ {getCatName(serviceCategories[service.id].open)}
+              </span>
+            ) : (
+              <span style={{ fontSize: 11, color: "#f59e0b" }}>⚠ Not configured</span>
+            )}
+          </div>
+
+          {expandedService === service.id && (
+            <div style={{ padding: "20px" }}>
+
+              {/* Category Selection */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Category settings</div>
+                {categories.length === 0 && (
+                  <div style={{ fontSize: 12, color: "#f59e0b", marginBottom: 12 }}>
+                    ⚠ Enter a valid Guild ID above to load categories.
+                  </div>
+                )}
+                {[
+                  { key: "open", label: "Open category" },
+                  { key: "claimed", label: "Claimed category" },
+                  { key: "closed", label: "Closed category" }
+                ].map(({ key, label }) => (
+                  <div key={key} style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
+                    <select
+                      style={S.input}
+                      value={serviceCategories[service.id]?.[key] || ""}
+                      onChange={e => setServiceCategories({
+                        ...serviceCategories,
+                        [service.id]: { ...serviceCategories[service.id], [key]: e.target.value }
+                      })}
+                    >
+                      <option value="">Select category...</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Ticket Naming */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Ticket naming</div>
+                <div style={{ fontSize: 12, color: "#6060a0", marginBottom: 12 }}>
+                  Options: {"{nickname}"} = contractor name, {"{count}"} = ticket number
+                </div>
+                {[
+                  { key: "opened", label: "Opened", placeholder: "ticket-{count}" },
+                  { key: "claimed", label: "Claimed", placeholder: "claimed-{nickname}-{count}" },
+                  { key: "closed", label: "Closed", placeholder: "closed-{count}" }
+                ].map(({ key, label, placeholder }) => (
+                  <div key={key} style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
+                    <input
+                      style={S.input}
+                      placeholder={placeholder}
+                      value={ticketNaming[service.id]?.[key] || ""}
+                      onChange={e => setTicketNaming({
+                        ...ticketNaming,
+                        [service.id]: { ...ticketNaming[service.id], [key]: e.target.value }
+                      })}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Enforced Claiming */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Enforced claiming</div>
+                <label style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
+                  <input
+                    type="checkbox"
+                    checked={enforcedClaiming[service.id]?.enabled || false}
+                    onChange={e => setEnforcedClaiming({
+                      ...enforcedClaiming,
+                      [service.id]: { ...enforcedClaiming[service.id], enabled: e.target.checked }
+                    })}
+                    style={{ marginRight: 8 }}
+                  />
+                  Enabled?
+                </label>
+                {[
+                  { key: "maxTickets", label: "Max tickets per contractor" },
+                  { key: "timeout", label: "Timeout (seconds)" }
+                ].map(({ key, label }) => (
+                  <div key={key} style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "#6060a0", display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
+                    <input
+                      type="number"
+                      style={S.input}
+                      value={enforcedClaiming[service.id]?.[key] || 0}
+                      onChange={e => setEnforcedClaiming({
+                        ...enforcedClaiming,
+                        [service.id]: { ...enforcedClaiming[service.id], [key]: parseInt(e.target.value) || 0 }
+                      })}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Service Status */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "#a78bfa" }}>Service status</div>
+                {[
+                  { key: "isOpen", label: "Service open?" },
+                  { key: "isQueueFull", label: "Queue full?" },
+                  { key: "isQueueOnBreak", label: "Queue on break?" }
+                ].map(({ key, label }) => (
+                  <label key={key} style={{ fontSize: 12, color: "#6060a0", fontWeight: 600, marginBottom: 8, display: "block" }}>
+                    <input
+                      type="checkbox"
+                      checked={key === "isOpen" ? serviceStatus[service.id]?.isOpen !== false : serviceStatus[service.id]?.[key] || false}
+                      onChange={e => setServiceStatus({
+                        ...serviceStatus,
+                        [service.id]: { ...serviceStatus[service.id], [key]: e.target.checked }
+                      })}
+                      style={{ marginRight: 8 }}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Save Button */}
+      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+        <button onClick={saveSettings} disabled={saving} style={{ ...S.btn("#34d398"), fontSize: 13, padding: "10px 20px" }}>
+          {saving ? "💾 Saving..." : "✅ Save All Settings"}
+        </button>
+        <button onClick={loadSettings} style={{ ...S.btnOutline, fontSize: 13, padding: "10px 20px" }}>
+          ↻ Reload
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
 const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
   const [tab, setTab] = useState("overview");
@@ -754,129 +1322,16 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
           )}
 
           {/* ── TELEGRAM ── */}
-          {tab==="Telegram" && (
+                    {tab==="Telegram" && (
             <div>
-              <SectionCard icon="✈" title="Telegram Settings" color="#60a5fa">
-                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>Telegram bot customisation</h3>
-                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
-                  Customize your Telegram bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your customers receive the best possible service.
-                </p>
-
-                {/* Commands */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:700 }}>Commands</div>
-                      <div style={{ fontSize:12, color:"#6060a0" }}>Telegram bots need start commands. It's the gateway to your bot's world and the first step towards engaging customers.</div>
-                    </div>
-                    <span style={{ color:"#6060a0" }}>›</span>
-                  </div>
-                  {commands.map((c,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <div>
-                        <span style={{ color:"#60a5fa", fontWeight:700, fontSize:13 }}>{c.cmd}</span>
-                        <div style={{ fontSize:12, color:"#6060a0" }}>{c.desc}</div>
-                      </div>
-                      <button onClick={() => setCommands(commands.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                    <input style={{ ...S.input, flex:1 }} placeholder="/command" value={newCmd.cmd} onChange={e=>setNewCmd({...newCmd,cmd:e.target.value})}/>
-                    <input style={{ ...S.input, flex:2 }} placeholder="Description" value={newCmd.desc} onChange={e=>setNewCmd({...newCmd,desc:e.target.value})}/>
-                    <button onClick={() => { if(newCmd.cmd){ setCommands([...commands,newCmd]); setNewCmd({cmd:"",desc:""}); }}} style={S.btn()}>+ Add</button>
-                  </div>
-                </div>
-
-                {/* Services */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Services / Buttons</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Add the services your bot offers as clickable buttons for customers.</div>
-                  {services.map((s,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:13 }}>{s}</span>
-                      <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                    <input style={{ ...S.input, flex:1 }} placeholder="e.g. Uber Eats $50+" value={newService} onChange={e=>setNewService(e.target.value)}/>
-                    <button onClick={() => { if(newService){ setServices([...services,newService]); setNewService(""); }}} style={S.btn()}>+ Add</button>
-                  </div>
-                </div>
-
-                {/* Questions */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Questions</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To unlock the full potential of your services, you need to gather information from your customers.</div>
-                  {questions.map((q,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:13 }}>{q}</span>
-                      <button onClick={() => setQuestions(questions.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                    <input style={{ ...S.input, flex:1 }} placeholder="e.g. What is your delivery address?" value={newQuestion} onChange={e=>setNewQuestion(e.target.value)}/>
-                    <button onClick={() => { if(newQuestion){ setQuestions([...questions,newQuestion]); setNewQuestion(""); }}} style={S.btn()}>+ Add</button>
-                  </div>
-                </div>
-
-                {/* Misc */}
-                <div style={{ marginBottom:8 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
-                  <SettingRow icon="🔔" title="Internal alert system" desc="Customize your bot's preset responses for a more personalized and engaging user experience." color="#f59e0b"/>
-                  <SettingRow icon="⌨" title="Internal commands" desc="Toggle whether you want your customers to have access to certain commands that we use internal." color="#60a5fa"/>
-                  <SettingRow icon="🔑" title="API keys" desc="Some functionality on BoostChat is too expensive to run on your behalf. Add your own API keys here." color="#a78bfa"/>
-                </div>
-
-                <div style={{ marginTop:16 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Announcements</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Announcements let you send messages with preset button URLs that can direct your customers straight to your bot.</div>
-                  <button style={{ ...S.btn(), fontSize:12 }}>+ New Announcement</button>
-                </div>
-              </SectionCard>
+              <TelegramSettingsTab node={node}/>
             </div>
           )}
-
-          {/* ── BOOSTCHAT ── */}
           {tab==="BoostChat" && (
             <div>
-              <SectionCard icon="⚡" title="BoostChat Settings" color="#f87171">
-                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>BoostChat bot customisation</h3>
-                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
-                  Configure your BoostChat bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your team delivers the best possible service.
-                </p>
-
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Bot customization</div>
-                  <SettingRow icon="🏷" title="Guild ID" desc="Change the BoostChat guild/server that we will listen to. This is where commands, messages, tickets and other data will be created." color="#a78bfa"/>
-                </div>
-
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Service ticket management</div>
-                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To effectively manage customer inquiries and responses, a ticket must be created every time a customer provides an answer. You need to designate a space where tickets will be generated.</div>
-                  {["5Guys","Uber Eats $50+","Chipotle","Door Dash 45% OFF","Dominos","Wing Stop","Panera"].map((s,i) => (
-                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:13 }}>{s}</span>
-                      <button style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>···</button>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Command permissions</div>
-                  <SettingRow icon="⊙" title="Default" desc="Change the permissions and availability of default commands. Default commands are the basics to the ticket tool system." color="#60a5fa"/>
-                  <SettingRow icon="🔧" title="Utility" desc="Change the permissions and availability of utility commands. Utility are more sensitive commands that help with other functionality on the bot." color="#f59e0b"/>
-                  <SettingRow icon="💰" title="Accounting" desc="Change the permissions and availability of accounting addon commands." color="#34d398"/>
-                </div>
-
-                <div>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
-                  <SettingRow icon="✦" title="Bot message passthrough" desc="Want a bots message to passthrough to your customers? This can result in errors unless you know what you're doing." color="#f87171"/>
-                </div>
-              </SectionCard>
+              <RevoltSettingsTab node={node}/>
             </div>
           )}
-
-          {/* ── WEBAPP ── */}
           {tab==="Webapp" && (
             <div style={{ ...S.card, padding:"48px", textAlign:"center", color:"#4040a0" }}>
               <div style={{ fontSize:32, marginBottom:12 }}>🌐</div>
@@ -1476,7 +1931,7 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   const ov = data?.overview || {};
 
   return (
-    <div style={{ height:"100%", overflow:"auto", margin:"-28px -32px" }}>
+    <div style={{ height:"100%", overflow:"auto" }}>
       {/* Header */}
       <div style={{ padding:"12px 24px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0d0d12", zIndex:10 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
