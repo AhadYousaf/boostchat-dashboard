@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import TelegramSettingsTab from "./TelegramSettingsTab";
-import RevoltSettingsTab from "./RevoltSettingsTab";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API = "https://onechat-backend-production.up.railway.app/api";
@@ -611,10 +609,13 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
   const [cutModal, setCutModal] = useState(false);
   const [cutPct, setCutPct] = useState("10");
 
-  // Telegram tab state (now handled by TelegramSettingsTab component)
-  // const [commands, setCommands] = useState([...]);  // REMOVED - component handles this
-  // const [services, setServices] = useState([]);     // REMOVED - component handles this
-  // const [questions, setQuestions] = useState([]);   // REMOVED - component handles this
+  // Telegram tab state
+  const [commands, setCommands] = useState([{ cmd:"/start", desc:"Start a brand new conversation with us #1" }]);
+  const [newCmd, setNewCmd] = useState({ cmd:"", desc:"" });
+  const [services, setServices] = useState([]);
+  const [newService, setNewService] = useState("");
+  const [questions, setQuestions] = useState([]);
+  const [newQuestion, setNewQuestion] = useState("");
 
   // Bot form
   const [botForm, setBotForm] = useState({ platform:"telegram", token:"", bot_name:"" });
@@ -754,12 +755,125 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
 
           {/* ── TELEGRAM ── */}
           {tab==="Telegram" && (
-            <TelegramSettingsTab node={node} api={api} S={S} />
+            <div>
+              <SectionCard icon="✈" title="Telegram Settings" color="#60a5fa">
+                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>Telegram bot customisation</h3>
+                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
+                  Customize your Telegram bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your customers receive the best possible service.
+                </p>
+
+                {/* Commands */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700 }}>Commands</div>
+                      <div style={{ fontSize:12, color:"#6060a0" }}>Telegram bots need start commands. It's the gateway to your bot's world and the first step towards engaging customers.</div>
+                    </div>
+                    <span style={{ color:"#6060a0" }}>›</span>
+                  </div>
+                  {commands.map((c,i) => (
+                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <div>
+                        <span style={{ color:"#60a5fa", fontWeight:700, fontSize:13 }}>{c.cmd}</span>
+                        <div style={{ fontSize:12, color:"#6060a0" }}>{c.desc}</div>
+                      </div>
+                      <button onClick={() => setCommands(commands.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                    <input style={{ ...S.input, flex:1 }} placeholder="/command" value={newCmd.cmd} onChange={e=>setNewCmd({...newCmd,cmd:e.target.value})}/>
+                    <input style={{ ...S.input, flex:2 }} placeholder="Description" value={newCmd.desc} onChange={e=>setNewCmd({...newCmd,desc:e.target.value})}/>
+                    <button onClick={() => { if(newCmd.cmd){ setCommands([...commands,newCmd]); setNewCmd({cmd:"",desc:""}); }}} style={S.btn()}>+ Add</button>
+                  </div>
+                </div>
+
+                {/* Services */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Services / Buttons</div>
+                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Add the services your bot offers as clickable buttons for customers.</div>
+                  {services.map((s,i) => (
+                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:13 }}>{s}</span>
+                      <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                    <input style={{ ...S.input, flex:1 }} placeholder="e.g. Uber Eats $50+" value={newService} onChange={e=>setNewService(e.target.value)}/>
+                    <button onClick={() => { if(newService){ setServices([...services,newService]); setNewService(""); }}} style={S.btn()}>+ Add</button>
+                  </div>
+                </div>
+
+                {/* Questions */}
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Questions</div>
+                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To unlock the full potential of your services, you need to gather information from your customers.</div>
+                  {questions.map((q,i) => (
+                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:13 }}>{q}</span>
+                      <button onClick={() => setQuestions(questions.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                    <input style={{ ...S.input, flex:1 }} placeholder="e.g. What is your delivery address?" value={newQuestion} onChange={e=>setNewQuestion(e.target.value)}/>
+                    <button onClick={() => { if(newQuestion){ setQuestions([...questions,newQuestion]); setNewQuestion(""); }}} style={S.btn()}>+ Add</button>
+                  </div>
+                </div>
+
+                {/* Misc */}
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
+                  <SettingRow icon="🔔" title="Internal alert system" desc="Customize your bot's preset responses for a more personalized and engaging user experience." color="#f59e0b"/>
+                  <SettingRow icon="⌨" title="Internal commands" desc="Toggle whether you want your customers to have access to certain commands that we use internal." color="#60a5fa"/>
+                  <SettingRow icon="🔑" title="API keys" desc="Some functionality on BoostChat is too expensive to run on your behalf. Add your own API keys here." color="#a78bfa"/>
+                </div>
+
+                <div style={{ marginTop:16 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Announcements</div>
+                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>Announcements let you send messages with preset button URLs that can direct your customers straight to your bot.</div>
+                  <button style={{ ...S.btn(), fontSize:12 }}>+ New Announcement</button>
+                </div>
+              </SectionCard>
+            </div>
           )}
 
           {/* ── BOOSTCHAT ── */}
           {tab==="BoostChat" && (
-            <RevoltSettingsTab node={node} api={api} S={S} />
+            <div>
+              <SectionCard icon="⚡" title="BoostChat Settings" color="#f87171">
+                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>BoostChat bot customisation</h3>
+                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
+                  Configure your BoostChat bot settings to fit your business needs. You have the power to modify the ticket system and any included addons, ensuring that your team delivers the best possible service.
+                </p>
+
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Bot customization</div>
+                  <SettingRow icon="🏷" title="Guild ID" desc="Change the BoostChat guild/server that we will listen to. This is where commands, messages, tickets and other data will be created." color="#a78bfa"/>
+                </div>
+
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Service ticket management</div>
+                  <div style={{ fontSize:12, color:"#6060a0", marginBottom:12 }}>To effectively manage customer inquiries and responses, a ticket must be created every time a customer provides an answer. You need to designate a space where tickets will be generated.</div>
+                  {["5Guys","Uber Eats $50+","Chipotle","Door Dash 45% OFF","Dominos","Wing Stop","Panera"].map((s,i) => (
+                    <div key={i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:6, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:13 }}>{s}</span>
+                      <button style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>···</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Command permissions</div>
+                  <SettingRow icon="⊙" title="Default" desc="Change the permissions and availability of default commands. Default commands are the basics to the ticket tool system." color="#60a5fa"/>
+                  <SettingRow icon="🔧" title="Utility" desc="Change the permissions and availability of utility commands. Utility are more sensitive commands that help with other functionality on the bot." color="#f59e0b"/>
+                  <SettingRow icon="💰" title="Accounting" desc="Change the permissions and availability of accounting addon commands." color="#34d398"/>
+                </div>
+
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Miscellaneous customization</div>
+                  <SettingRow icon="✦" title="Bot message passthrough" desc="Want a bots message to passthrough to your customers? This can result in errors unless you know what you're doing." color="#f87171"/>
+                </div>
+              </SectionCard>
+            </div>
           )}
 
           {/* ── WEBAPP ── */}
@@ -919,110 +1033,152 @@ const TicketsPage = ({ selectedNode }) => {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const limit = 50;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (selectedNode) params.append("node_id", selectedNode.id);
-      if (filter!=="all") params.append("status", filter);
-      params.append("limit","50");
+      if (filter !== "all") params.append("status", filter);
+      params.append("limit", limit);
+      params.append("page", page);
       const data = await api(`/tickets?${params}`);
-      setTickets(data.tickets||[]);
-      setTotal(data.total||0);
+      setTickets(data.tickets || []);
+      setTotal(data.total || 0);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  }, [selectedNode, filter]);
+  }, [selectedNode, filter, page]);
 
   useEffect(() => { load(); }, [load]);
 
   const filtered = tickets.filter(t =>
-    [t.customer_username, t.customer_display, t.service_name].some(v => v?.toLowerCase().includes(search.toLowerCase()))
+    [t.customer_username, t.customer_display, t.service_name, t.worker_username].some(v => v?.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const statusColor = (s) => ({ open:"#f59e0b", in_progress:"#60a5fa", paid:"#34d398", closed:"#6060a0", cancelled:"#e05050" }[s]||"#6060a0");
+  const statusColor = (s) => ({ open:"#f59e0b", pending:"#f59e0b", in_progress:"#60a5fa", paid:"#34d398", closed:"#6060a0", cancelled:"#e05050", deleted:"#e05050" }[s] || "#6060a0");
+  const statusLabel = (s) => ({ open:"Open", pending:"Pending", in_progress:"Active", paid:"Paid", closed:"Closed", cancelled:"Cancelled", deleted:"Deleted" }[s] || s);
+
+  const timeAgo = (date) => {
+    const s = Math.floor((new Date() - new Date(date)) / 1000);
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+    return `${Math.floor(s/86400)}d ago`;
+  };
+
+  const totalPages = Math.ceil(total / limit);
 
   return (
-    <div style={{ display:"flex", height:"100%", margin:"-28px -32px" }}>
-      <div style={{ width:180, background:"#13131a", borderRight:"1px solid #1e1e2e", padding:"14px 10px", flexShrink:0 }}>
-        <div style={{ fontSize:10, color:"#3a3a5a", textTransform:"uppercase", letterSpacing:1, marginBottom:8, padding:"0 6px" }}>
-          {selectedNode?selectedNode.name.toUpperCase():"ALL NODES"}
+    <div style={{ display:"flex", height:"100%", margin:"-28px -32px", overflow:"hidden" }}>
+      {/* Sidebar */}
+      <div style={{ width:160, background:"#13131a", borderRight:"1px solid #1e1e2e", padding:"14px 8px", flexShrink:0, display:"flex", flexDirection:"column" }}>
+        <div style={{ fontSize:10, color:"#3a3a5a", textTransform:"uppercase", letterSpacing:1, marginBottom:10, padding:"0 6px" }}>
+          {selectedNode ? selectedNode.name.toUpperCase() : "ALL NODES"}
         </div>
-        {[["all","≡","Overview"],["open","✉","Open"],["in_progress","⟳","In Progress"],["paid","✓","Paid"],["closed","✕","Closed"]].map(([id,icon,label]) => (
-          <button key={id} onClick={() => setFilter(id)}
-            style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:8, border:"none",
-              background:filter===id?"#6c4fd822":"transparent", color:filter===id?"#a78bfa":"#c0c0e0", cursor:"pointer", fontSize:13, marginBottom:2 }}>
-            <span>{icon}</span><span style={{ flex:1, textAlign:"left" }}>{label}</span>
-          </button>
-        ))}
+        {[["all","All"],["open","Open"],["in_progress","Active"],["paid","Paid"],["closed","Closed"],["cancelled","Cancelled"]].map(([id, label]) => {
+          const color = statusColor(id === "all" ? "open" : id);
+          return (
+            <button key={id} onClick={() => { setFilter(id); setPage(1); }}
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"7px 10px", borderRadius:8, border:"none",
+                background:filter===id?"#6c4fd822":"transparent", color:filter===id?"#a78bfa":"#c0c0e0",
+                cursor:"pointer", fontSize:12, marginBottom:2, textAlign:"left" }}>
+              {id !== "all" && <span style={{ width:6, height:6, borderRadius:"50%", background:color, flexShrink:0 }}/>}
+              {id === "all" && <span style={{ fontSize:14 }}>≡</span>}
+              {label}
+            </button>
+          );
+        })}
       </div>
-      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tickets, services, contractors..." style={{ ...S.input, width:320 }}/>
-          <span style={{ fontSize:12, color:"#6060a0" }}>Anything that matches</span>
-          <button onClick={load} style={{ ...S.btnOutline, fontSize:12, marginLeft:"auto" }}>↻ Refresh</button>
+
+      {/* Main content */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
+        {/* Toolbar */}
+        <div style={{ padding:"8px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search tickets..." style={{ ...S.input, flex:1, maxWidth:280, fontSize:12, padding:"6px 10px" }}/>
+          <span style={{ fontSize:11, color:"#6060a0", whiteSpace:"nowrap" }}>{total} total</span>
+          <button onClick={load} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px", marginLeft:"auto" }}>↻</button>
         </div>
+
+        {/* Table */}
         <div style={{ overflowY:"auto", flex:1 }}>
-          {loading ? <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading tickets...</div>
-          : filtered.length===0 ? (
+          {loading ? (
+            <div style={{ padding:"32px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading...</div>
+          ) : filtered.length === 0 ? (
             <div style={{ padding:"48px", textAlign:"center", color:"#4040a0" }}>
-              <div style={{ fontSize:32, marginBottom:12 }}>🎫</div>
-              <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>No tickets yet</div>
+              <div style={{ fontSize:28, marginBottom:10 }}>🎫</div>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>No tickets</div>
               <div style={{ fontSize:13 }}>Tickets will appear here when customers message your bot.</div>
             </div>
           ) : (
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", tableLayout:"fixed" }}>
+              <colgroup>
+                <col style={{ width:28 }}/>
+                <col style={{ width:"22%" }}/>
+                <col style={{ width:"18%" }}/>
+                <col style={{ width:"14%" }}/>
+                <col style={{ width:"18%" }}/>
+                <col style={{ width:"14%" }}/>
+                <col style={{ width:"14%" }}/>
+              </colgroup>
               <thead style={{ position:"sticky", top:0, background:"#13131a", zIndex:5 }}>
                 <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                  <th style={{ width:32, padding:"10px 12px" }}></th>
-                  <th style={{ padding:"10px 16px", textAlign:"left", fontSize:11, color:"#6060a0", fontWeight:700 }}>Username/key</th>
-                  <th style={{ padding:"10px 16px", textAlign:"left", fontSize:11, color:"#6060a0", fontWeight:700 }}>Service name</th>
-                  <th style={{ padding:"10px 16px", textAlign:"left", fontSize:11, color:"#6060a0", fontWeight:700 }}>Last message within ticket</th>
-                  <th style={{ padding:"10px 16px", textAlign:"left", fontSize:11, color:"#6060a0", fontWeight:700 }}>Worker</th>
-                  <th style={{ padding:"10px 16px", textAlign:"right", fontSize:11, color:"#6060a0", fontWeight:700 }}>Time</th>
+                  <th style={{ padding:"8px 8px" }}></th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>CUSTOMER</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>SERVICE</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>STATUS</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>WORKER</th>
+                  <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>PAID</th>
+                  <th style={{ padding:"8px 12px", textAlign:"right", fontSize:10, color:"#6060a0", fontWeight:700 }}>TIME</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t,i) => {
+                {filtered.map(t => {
                   const sc = statusColor(t.status);
-                  const isPaid = t.status==="paid";
-                  const isCancelled = t.status==="cancelled";
+                  const hasPaid = parseFloat(t.amount_paid || 0) > 0;
                   return (
-                    <tr key={t.id} style={{ borderBottom:"1px solid #1a1a2a", background:isCancelled?"rgba(224,80,80,0.06)":isPaid?"rgba(52,211,152,0.04)":"transparent", cursor:"pointer" }}>
-                      <td style={{ padding:"10px 12px", textAlign:"center" }}>
-                        <div style={{ width:20, height:20, borderRadius:"50%", background:sc+"22", border:`1px solid ${sc}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:sc }}>
-                          {isCancelled?"✕":"✓"}
-                        </div>
+                    <tr key={t.id} style={{ borderBottom:"1px solid #1a1a2a", cursor:"pointer" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#1a1a28"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding:"8px 8px", textAlign:"center" }}>
+                        <div style={{ width:7, height:7, borderRadius:"50%", background:sc, margin:"0 auto" }}/>
                       </td>
-                      <td style={{ padding:"10px 16px" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                          <div style={{ width:28, height:28, borderRadius:"50%", background:"linear-gradient(135deg,#2a2a4e,#3a2a5e)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, flexShrink:0 }}>
-                            {(t.customer_username||t.customer_display||"?")[0].toUpperCase()}
+                      <td style={{ padding:"8px 12px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <div style={{ width:24, height:24, borderRadius:"50%", background:"#2a2a4e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, flexShrink:0 }}>
+                            {(t.customer_username || t.customer_display || "?")[0].toUpperCase()}
                           </div>
-                          <span style={{ fontSize:13, color:"#60a5fa", fontWeight:600 }}>
-                            {t.customer_username?`⊙ ${t.customer_username}`:t.customer_display||"Unknown"}
+                          <span style={{ fontSize:12, color:"#60a5fa", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {t.customer_username ? `@${t.customer_username}` : t.customer_display || "Unknown"}
                           </span>
                         </div>
                       </td>
-                      <td style={{ padding:"10px 16px" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span style={{ fontSize:13, fontWeight:600 }}>{t.service_name||"—"}</span>
-                          {t.service_name && <span style={{ fontSize:10 }}>⚡</span>}
-                        </div>
+                      <td style={{ padding:"8px 12px" }}>
+                        <span style={{ fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block" }}>
+                          {t.service_name || "—"}
+                        </span>
                       </td>
-                      <td style={{ padding:"10px 16px", fontSize:13, color:"#8080a0", maxWidth:300 }}>
-                        <div style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>No last message</div>
+                      <td style={{ padding:"8px 12px" }}>
+                        <span style={{ background:sc+"22", color:sc, border:`1px solid ${sc}44`, borderRadius:4, padding:"2px 7px", fontSize:10, fontWeight:700, whiteSpace:"nowrap" }}>
+                          {statusLabel(t.status)}
+                        </span>
                       </td>
-                      <td style={{ padding:"10px 16px" }}>
-                        {t.worker_username ? (
-                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <span style={{ background:"#6c4fd822", color:"#a78bfa", border:"1px solid #6c4fd844", borderRadius:4, padding:"1px 8px", fontSize:11, fontWeight:600 }}>{t.worker_username}</span>
-                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 8px", fontSize:11, fontWeight:600 }}>$ {parseFloat(t.amount_paid||0).toFixed(2)}</span>
-                          </div>
-                        ) : <span style={{ color:"#4040a0", fontSize:12 }}>Unassigned</span>}
+                      <td style={{ padding:"8px 12px" }}>
+                        {t.worker_username
+                          ? <span style={{ fontSize:12, color:"#a78bfa", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block" }}>{t.worker_username}</span>
+                          : <span style={{ color:"#3a3a6a", fontSize:11 }}>Unassigned</span>}
                       </td>
-                      <td style={{ padding:"10px 16px", fontSize:11, color:"#6060a0", textAlign:"right", whiteSpace:"nowrap" }}>
-                        {new Date(t.updated_at).toLocaleString()}
+                      <td style={{ padding:"8px 12px" }}>
+                        {hasPaid
+                          ? <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"2px 7px", fontSize:10, fontWeight:700 }}>
+                              ${parseFloat(t.amount_paid).toFixed(2)}
+                            </span>
+                          : <span style={{ color:"#3a3a6a", fontSize:11 }}>—</span>}
+                      </td>
+                      <td style={{ padding:"8px 12px", fontSize:11, color:"#6060a0", textAlign:"right", whiteSpace:"nowrap" }}>
+                        {timeAgo(t.updated_at)}
                       </td>
                     </tr>
                   );
@@ -1031,12 +1187,16 @@ const TicketsPage = ({ selectedNode }) => {
             </table>
           )}
         </div>
-        <div style={{ padding:"10px 20px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:12, color:"#6060a0", flexShrink:0 }}>
-          <span>{filtered.length} selected / {total} total</span>
-          <div style={{ display:"flex", gap:6 }}>
-            <button style={{ ...S.btnOutline, padding:"4px 10px", fontSize:12 }}>‹</button>
-            <button style={{ ...S.btn(), padding:"4px 12px", fontSize:12 }}>1</button>
-            <button style={{ ...S.btnOutline, padding:"4px 10px", fontSize:12 }}>›</button>
+
+        {/* Pagination */}
+        <div style={{ padding:"8px 16px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11, color:"#6060a0", flexShrink:0 }}>
+          <span>{filtered.length} shown / {total} total</span>
+          <div style={{ display:"flex", gap:4 }}>
+            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}
+              style={{ ...S.btnOutline, padding:"3px 8px", fontSize:11, opacity:page===1?0.4:1 }}>‹</button>
+            <span style={{ padding:"3px 8px", fontSize:11, color:"#a0a0c0" }}>Page {page} of {totalPages||1}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page>=totalPages}
+              style={{ ...S.btnOutline, padding:"3px 8px", fontSize:11, opacity:page>=totalPages?0.4:1 }}>›</button>
           </div>
         </div>
       </div>
@@ -1049,7 +1209,7 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("30");
-  const targetNode = selectedNode||nodes[0];
+  const targetNode = selectedNode || nodes[0];
 
   useEffect(() => {
     if (!targetNode) return;
@@ -1062,131 +1222,151 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
     load();
   }, [targetNode, period]);
 
-  if (!targetNode) return <div style={{ padding:"48px", textAlign:"center", color:"#4040a0" }}><div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>No nodes yet</div></div>;
+  if (!targetNode) return (
+    <div style={{ padding:"48px", textAlign:"center", color:"#4040a0" }}>
+      <div style={{ fontSize:14, fontWeight:700 }}>No nodes yet</div>
+    </div>
+  );
 
   const ov = data?.overview || {};
 
   return (
-    <div style={{ margin:"-28px -32px" }}>
-      <div style={{ padding:"14px 28px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+    <div style={{ height:"100%", overflow:"auto", margin:"-28px -32px" }}>
+      {/* Header */}
+      <div style={{ padding:"12px 24px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0d0d12", zIndex:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ fontSize:13, color:"#6060a0" }}>Analytics for</span>
           <span style={{ fontWeight:700, fontSize:14 }}>{targetNode.name}</span>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ ...S.input, width:"auto", padding:"4px 10px", fontSize:12 }}>
+        <select value={period} onChange={e => setPeriod(e.target.value)}
+          style={{ ...S.input, width:"auto", padding:"4px 10px", fontSize:12 }}>
           <option value="7">Last 7 days</option>
           <option value="30">Last 30 days</option>
           <option value="90">Last 90 days</option>
         </select>
       </div>
 
-      {loading ? <div style={{ padding:"48px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading analytics...</div> : (
-        <>
-          {/* Big stat bars */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", borderBottom:"1px solid #1e1e2e" }}>
+      {loading ? (
+        <div style={{ padding:"48px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}>
+          <Spinner/> Loading analytics...
+        </div>
+      ) : (
+        <div style={{ padding:"24px" }}>
+          {/* Top stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:24 }}>
             {[
-              { label:"MAX TICKETS", value:`# ${ov.total_tickets||0}`, color:"#60a5fa", sub:"—" },
-              { label:"REVENUE", value:`$ ${parseFloat(ov.total_revenue||0).toFixed(2)}`, color:"#34d398", sub:"—" },
-              { label:"PAID TICKETS", value:`$ ${parseFloat(ov.total_revenue||0).toFixed(2)}`, color:"#f59e0b", sub:"—" },
+              { label:"TOTAL TICKETS", value:`${ov.total_tickets||0}`, color:"#60a5fa", icon:"🎫" },
+              { label:"TOTAL REVENUE", value:`$${parseFloat(ov.total_revenue||0).toFixed(2)}`, color:"#34d398", icon:"💰" },
+              { label:"PAID TICKETS", value:`${ov.paid_tickets||0}`, color:"#f59e0b", icon:"✅" },
             ].map((s,i) => (
-              <div key={i} style={{ padding:"20px 28px", background:s.color+"15", borderRight:i<2?"1px solid #1e1e2e":"none", position:"relative", overflow:"hidden" }}>
-                <div style={{ fontSize:10, color:s.color+"99", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>{s.label}</div>
-                <div style={{ fontSize:32, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</div>
-                <div style={{ fontSize:11, color:s.color+"66" }}>Show from previous items by 0%</div>
-                <div style={{ position:"absolute", right:0, bottom:0, top:0, width:"30%", opacity:0.15 }}>
-                  <MiniChart data={data?.daily||[]} color={s.color} valueKey={i===0?"tickets":"revenue"}/>
-                </div>
+              <div key={i} style={{ ...S.card, padding:"20px 24px", position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", right:16, top:16, fontSize:32, opacity:0.1 }}>{s.icon}</div>
+                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+                <div style={{ fontSize:30, fontWeight:900, color:s.color }}>{s.value}</div>
               </div>
             ))}
           </div>
 
-          <div style={{ padding:"24px 28px" }}>
-            {/* Revenue chart */}
-            <div style={{ ...S.card, marginBottom:20 }}>
-              <div style={{ padding:"14px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <div style={{ display:"flex", gap:16 }}>
-                  {[["Revenue/Profits","revenue"],["Tickets","tickets"],["Platform","platform"]].map(([label,id]) => (
-                    <button key={id} style={{ padding:"4px 12px", border:"none", background:"transparent", color:id==="revenue"?"#60a5fa":"#6060a0", cursor:"pointer", fontSize:13, fontWeight:700, borderBottom:id==="revenue"?"2px solid #60a5fa":"2px solid transparent" }}>{label}</button>
-                  ))}
-                </div>
-                <div style={{ fontSize:16, fontWeight:900, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</div>
-              </div>
-              <div style={{ padding:"20px" }}>
-                <MiniChart data={data?.daily||[]} color="#60a5fa" valueKey="revenue"/>
-                {!data?.daily?.length && <div style={{ textAlign:"center", color:"#4040a0", fontSize:13, marginTop:8 }}>No revenue data yet for this period.</div>}
-              </div>
+          {/* Revenue chart */}
+          <div style={{ ...S.card, marginBottom:24 }}>
+            <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <span style={{ fontWeight:700, fontSize:13 }}>Revenue over time</span>
+              <span style={{ fontSize:16, fontWeight:900, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</span>
             </div>
+            <div style={{ padding:"16px 20px" }}>
+              <MiniChart data={data?.daily||[]} color="#60a5fa" valueKey="revenue"/>
+              {!data?.daily?.length && <div style={{ textAlign:"center", color:"#4040a0", fontSize:13, marginTop:8 }}>No data for this period.</div>}
+            </div>
+          </div>
 
-            {/* Services + Workers tables */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:20 }}>
-              <div style={S.card}>
-                <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", gap:12 }}>
-                  <button style={{ padding:"4px 10px", border:"none", background:"transparent", color:"#a78bfa", cursor:"pointer", fontSize:13, fontWeight:700, borderBottom:"2px solid #a78bfa" }}>🛎 Services</button>
-                  <button style={{ padding:"4px 10px", border:"none", background:"transparent", color:"#6060a0", cursor:"pointer", fontSize:13 }}>Compare</button>
-                </div>
-                {!data?.services?.length ? <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No service data yet.</div>
-                : (
+          {/* Services + Workers */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:24 }}>
+            {/* Services */}
+            <div style={S.card}>
+              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>🛎 Top Services</div>
+              {!data?.services?.length ? (
+                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No service data yet.</div>
+              ) : (
+                <div style={{ overflowX:"auto" }}>
                   <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                    <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                      {["Service","Tickets","Revenue","Profits"].map(h=><th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>)}
-                    </tr></thead>
+                    <thead>
+                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                        {["Service","Tickets","Revenue"].map(h => (
+                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
                     <tbody>
                       {data.services.map((s,i) => (
                         <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
-                          <td style={{ padding:"8px 12px", fontSize:12 }}>{s.service_name}</td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}># {s.tickets}</span></td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}>$ {parseFloat(s.revenue).toFixed(2)}</span></td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}>$ {(parseFloat(s.revenue)*0.3).toFixed(2)}</span></td>
+                          <td style={{ padding:"8px 12px", fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{s.service_name}</td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{s.tickets}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(s.revenue).toFixed(2)}</span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-
-              <div style={S.card}>
-                <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", gap:12 }}>
-                  <button style={{ padding:"4px 10px", border:"none", background:"transparent", color:"#a78bfa", cursor:"pointer", fontSize:13, fontWeight:700, borderBottom:"2px solid #a78bfa" }}>👥 Contractors</button>
-                  <button style={{ padding:"4px 10px", border:"none", background:"transparent", color:"#6060a0", cursor:"pointer", fontSize:13 }}>Compare</button>
                 </div>
-                {!data?.workers?.length ? <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No worker data yet.</div>
-                : (
+              )}
+            </div>
+
+            {/* Workers */}
+            <div style={S.card}>
+              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>👥 Workers</div>
+              {!data?.workers?.length ? (
+                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No worker data yet.</div>
+              ) : (
+                <div style={{ overflowX:"auto" }}>
                   <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                    <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                      {["Contractor","Tier","Tickets","Revenue","Profits"].map(h=><th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>)}
-                    </tr></thead>
+                    <thead>
+                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                        {["Worker","Tickets","Revenue","Cut"].map(h => (
+                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
                     <tbody>
                       {data.workers.map((w,i) => (
                         <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
                           <td style={{ padding:"8px 12px", fontSize:12 }}>{w.username}</td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#a78bfa22", color:"#a78bfa", border:"1px solid #a78bfa44", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}>T1</span></td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}># {w.tickets}</span></td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}>$ {parseFloat(w.revenue).toFixed(2)}</span></td>
-                          <td style={{ padding:"8px 12px" }}><span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:4, padding:"1px 8px", fontSize:10, fontWeight:600 }}>$ {(parseFloat(w.revenue)*w.cut_percentage/100).toFixed(2)}</span></td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{w.tickets}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(w.revenue).toFixed(2)}</span>
+                          </td>
+                          <td style={{ padding:"8px 12px" }}>
+                            <span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>
+                              ${(parseFloat(w.revenue) * (w.cut_percentage||0) / 100).toFixed(2)}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom stats */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16, marginBottom:20 }}>
-              {[
-                { label:"RETURNING CUSTOMERS", value:`# ${ov.unique_customers||0}`, color:"#e05050" },
-                { label:"AVERAGE REVENUE / CUSTOMER", value:`$ ${ov.unique_customers?((ov.total_revenue||0)/ov.unique_customers).toFixed(2):"0.00"}`, color:"#f87171" },
-                { label:"CUSTOMER RETENTION RATE", value:`% ${ov.paid_tickets&&ov.total_tickets?(((ov.paid_tickets/ov.total_tickets)*100).toFixed(0)):"0"}`, color:"#c084fc" },
-              ].map((s,i) => (
-                <div key={i} style={{ padding:"16px 20px", background:s.color+"15", border:`1px solid ${s.color}22`, borderRadius:12 }}>
-                  <div style={{ fontSize:10, color:s.color+"99", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>{s.label}</div>
-                  <div style={{ fontSize:28, fontWeight:900, color:s.color }}>{s.value}</div>
-                  <div style={{ fontSize:11, color:s.color+"66", marginTop:4 }}>Show from previous items by 0%</div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
-        </>
+
+          {/* Bottom stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16 }}>
+            {[
+              { label:"UNIQUE CUSTOMERS", value:`${ov.unique_customers||0}`, color:"#e05050" },
+              { label:"AVG REVENUE / CUSTOMER", value:`$${ov.unique_customers ? ((ov.total_revenue||0)/ov.unique_customers).toFixed(2) : "0.00"}`, color:"#f87171" },
+              { label:"COMPLETION RATE", value:`${ov.paid_tickets&&ov.total_tickets ? (((ov.paid_tickets/ov.total_tickets)*100).toFixed(0)) : "0"}%`, color:"#c084fc" },
+            ].map((s,i) => (
+              <div key={i} style={{ ...S.card, padding:"16px 20px" }}>
+                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+                <div style={{ fontSize:26, fontWeight:900, color:s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
