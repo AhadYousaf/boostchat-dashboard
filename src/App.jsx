@@ -712,7 +712,7 @@ const TelegramSettingsTab = ({ node }) => {
                   <button onClick={() => setExpandedCmd(expandedCmd===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
                     {expandedCmd===i?"▲":"▼"}
                   </button>
-                  <button onClick={() => setCommands(commands.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                  <button onClick={() => { if(window.confirm("Delete this command?")) setCommands(commands.filter((_,j)=>j!==i)); }} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
                 </div>
               </div>
               {expandedCmd===i && (
@@ -724,7 +724,7 @@ const TelegramSettingsTab = ({ node }) => {
                   {c.message_image && (
                     <div style={{ marginBottom:8, position:"relative", display:"inline-block" }}>
                       <img src={c.message_image} alt="Command" style={{ maxWidth:180, maxHeight:120, borderRadius:8, border:"1px solid #2a2a3e", display:"block" }}/>
-                      <button onClick={() => setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_image:null}:cmd))}
+                      <button onClick={() => { if(window.confirm("Remove this image?")) setCommands(commands.map((cmd,j)=>j===i?{...cmd,message_image:null}:cmd)); }}
                         style={{ position:"absolute", top:-6, right:-6, background:"#e05050", border:"none", borderRadius:"50%", width:20, height:20, color:"#fff", cursor:"pointer", fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>✕</button>
                     </div>
                   )}
@@ -817,7 +817,7 @@ const TelegramSettingsTab = ({ node }) => {
                   <button onClick={() => setExpandedSvc(expandedSvc===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
                     {expandedSvc===i?"▲":"···"}
                   </button>
-                  <button onClick={() => setServices(services.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                  <button onClick={() => { if(window.confirm("Delete this service?")) setServices(services.filter((_,j)=>j!==i)); }} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
                 </div>
               </div>
               {expandedSvc===i && (
@@ -910,7 +910,7 @@ const TelegramSettingsTab = ({ node }) => {
                   <button onClick={() => setExpandedQ(expandedQ===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
                     {expandedQ===i?"▲":"✏"}
                   </button>
-                  <button onClick={() => setQuestions(questions.filter((_,j)=>j!==i))} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
+                  <button onClick={() => { if(window.confirm("Delete this question?")) setQuestions(questions.filter((_,j)=>j!==i)); }} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px", color:"#e05050", borderColor:"#e0505044" }}>✕</button>
                 </div>
               </div>
               {expandedQ===i && (
