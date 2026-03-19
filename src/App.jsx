@@ -146,9 +146,9 @@ const MiniChart = ({ data = [], color = "#6c4fd8", valueKey = "revenue" }) => {
 };
 
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
-const TopBar = ({ user, onLogout, showNotifs, setShowNotifs }) => (
+const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode }) => (
   <div style={S.topbar}>
-    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); }}>
       <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>⚡</div>
       <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>BoostChat</span>
     </div>
@@ -1303,8 +1303,8 @@ const RevoltSettingsTab = ({ node }) => {
 };
 
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
-const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
-  const [tab, setTab] = useState("overview");
+const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
+  const [tab, setTab] = useState(initialTab || "Node Overview");
   const [nodeData, setNodeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cutModal, setCutModal] = useState(false);
@@ -1394,7 +1394,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
 
       <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:"1px solid #1e1e2e" }}>
         {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t} onClick={() => { setTab(t); window.location.hash = 'node-detail:' + node.id + ':' + encodeURIComponent(t); }}
             style={{ padding:"8px 16px", border:"none", background:"transparent",
               color:tab===t?(tabColors[t]||"#a78bfa"):"#6060a0", cursor:"pointer", fontSize:13, fontWeight:700,
               borderBottom:tab===t?`2px solid ${tabColors[t]||"#a78bfa"}`:"2px solid transparent", marginBottom:-1, display:"flex", alignItems:"center", gap:6 }}>
@@ -1707,24 +1707,6 @@ ${conversation}` }]
     finally { setSummarizing(false); }
   };
 
-  const [deleteMenu, setDeleteMenu] = useState(false);
-
-  const handleSoftDelete = async () => {
-    if (!window.confirm("Archive this ticket? It will be hidden but kept in the database.")) return;
-    try {
-      await api(`/tickets/${ticket.id}`, { method:"DELETE" });
-      onClose();
-    } catch (err) { alert(err.message); }
-  };
-
-  const handleHardDelete = async () => {
-    if (!window.confirm("Permanently delete this ticket? This removes it from analytics too. This cannot be undone.")) return;
-    try {
-      await api(`/tickets/${ticket.id}/hard`, { method:"DELETE" });
-      onClose();
-    } catch (err) { alert(err.message); }
-  };
-
   const sc = { open:"#f59e0b", pending:"#f59e0b", in_progress:"#60a5fa", paid:"#34d398", closed:"#6060a0", cancelled:"#e05050" };
   const statusColor = sc[ticket.status] || "#6060a0";
   const hasPaid = parseFloat(ticket.amount_paid || 0) > 0;
@@ -1750,21 +1732,6 @@ ${conversation}` }]
         <span style={{ background:statusColor+"22", color:statusColor, border:`1px solid ${statusColor}44`, borderRadius:4, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
           {ticket.status}
         </span>
-        <div style={{ position:"relative" }}>
-          <button onClick={() => setDeleteMenu(v=>!v)} style={{ background:"#e0505022", border:"1px solid #e0505044", borderRadius:6, padding:"3px 8px", color:"#f87171", cursor:"pointer", fontSize:11, fontWeight:700 }}>🗑</button>
-          {deleteMenu && (
-            <div style={{ position:"absolute", right:0, top:32, background:"#16161f", border:"1px solid #2a2a3e", borderRadius:8, zIndex:50, boxShadow:"0 8px 24px #00000090", minWidth:180 }} onClick={e=>e.stopPropagation()}>
-              <button onClick={() => { setDeleteMenu(false); handleSoftDelete(); }}
-                style={{ width:"100%", padding:"10px 14px", background:"transparent", border:"none", color:"#f59e0b", cursor:"pointer", fontSize:12, textAlign:"left", borderBottom:"1px solid #1e1e2e", fontWeight:600 }}>
-                📦 Archive (keeps analytics)
-              </button>
-              <button onClick={() => { setDeleteMenu(false); handleHardDelete(); }}
-                style={{ width:"100%", padding:"10px 14px", background:"transparent", border:"none", color:"#f87171", cursor:"pointer", fontSize:12, textAlign:"left", fontWeight:600 }}>
-                🗑 Permanently Delete
-              </button>
-            </div>
-          )}
-        </div>
         <button onClick={onClose} style={{ background:"transparent", border:"none", color:"#6060a0", cursor:"pointer", fontSize:18, lineHeight:1, padding:"2px 4px" }}>✕</button>
       </div>
 
@@ -2064,7 +2031,7 @@ const TicketsPage = ({ selectedNode }) => {
 
       {/* Ticket detail panel */}
       {selectedTicket && (
-        <TicketDetailPanel ticket={selectedTicket} onClose={() => { setSelectedTicket(null); load(); }}/>
+        <TicketDetailPanel ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
       )}
     </div>
   );
@@ -2515,7 +2482,6 @@ const SettingsPage = ({ user }) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-
   const getInitialPage = () => {
     const hash = window.location.hash.replace('#', '');
     if (hash.startsWith('node-detail:')) return 'node-detail';
@@ -2622,7 +2588,7 @@ export default function App() {
         button { font-family:inherit; }
         @keyframes spin { to { transform:rotate(360deg); } }
       `}</style>
-      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs}/>
+      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs} setPage={setPage} setSelectedNode={setSelectedNode}/>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <Sidebar page={page} setPage={setPage} nodes={nodes} nodesLoading={nodesLoading} selectedNode={selectedNode} setSelectedNode={setSelectedNode} collapsed={collapsed} setCollapsed={setCollapsed}/>
         <div style={{ flex:1, overflowY:fullHeight?"hidden":"auto", padding:fullHeight?0:"28px 32px", background:"#0d0d12", display:fullHeight?"flex":"block", flexDirection:fullHeight?"column":undefined }}>
