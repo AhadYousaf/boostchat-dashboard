@@ -24,16 +24,43 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;ove
 
 body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:0.4}
 
+/* ── SCROLL PROGRESS BAR ── */
+#progress-bar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent3));z-index:200;width:0%;pointer-events:none}
+
 /* ── NAV ── */
-nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 60px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);background:rgba(8,8,16,0.7);border-bottom:1px solid rgba(124,90,240,0.08)}
+nav{position:fixed;top:2px;left:0;right:0;z-index:100;padding:20px 60px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);background:rgba(8,8,16,0.7);border-bottom:1px solid rgba(124,90,240,0.08)}
 .logo{font-family:'Syne',sans-serif;font-weight:900;font-size:20px;letter-spacing:-0.5px;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
 .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#4a90e2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .logo span{color:var(--accent)}
-.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:32px;align-items:center}
 .nav-links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500;transition:color 0.2s}
 .nav-links a:hover{color:var(--text)}
 .nav-cta{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.2s;font-family:'DM Sans',sans-serif}
 .nav-cta:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── MARQUEE TICKER ── */
+.marquee-wrap{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:rgba(124,90,240,0.04);padding:12px 0;white-space:nowrap}
+.marquee-track{display:inline-flex;animation:marquee 28s linear infinite}
+.marquee-track:hover{animation-play-state:paused}
+.marquee-item{display:inline-flex;align-items:center;gap:10px;padding:0 32px;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase}
+.marquee-dot{width:4px;height:4px;border-radius:50%;background:var(--accent);flex-shrink:0}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ── MOUSE GLOW ── */
+#mouse-glow{position:fixed;pointer-events:none;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(124,90,240,0.06) 0%,transparent 70%);transform:translate(-50%,-50%);z-index:0;top:0;left:0}
+
+/* ── FLOATING PARTICLES ── */
+#particles{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.particle{position:absolute;border-radius:50%;opacity:0;animation:particleDrift linear infinite}
+@keyframes particleDrift{0%{opacity:0;transform:translateY(0) scale(0)}15%{opacity:0.8}85%{opacity:0.4}100%{opacity:0;transform:translateY(-80vh) scale(1.2)}}
+
+/* ── MOCKUP GLOW BORDER ── */
+.mockup-border{border-radius:17px;padding:1px;background:linear-gradient(135deg,rgba(124,90,240,0.6),rgba(96,165,250,0.3),rgba(52,211,152,0.4),rgba(124,90,240,0.6));background-size:300% 300%;animation:borderPulse 5s ease infinite;position:relative}
+.mockup{background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,0.8)}
+@keyframes borderPulse{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+/* ── TILT FEATURE CARDS ── */
+.feature-visual{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;height:380px;position:relative;transition:box-shadow 0.3s ease;transform-style:preserve-3d;will-change:transform}
 
 /* ── HERO ── */
 .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 40px 80px;position:relative;overflow:hidden}
@@ -113,7 +140,6 @@ svg.chart{position:absolute;top:0;left:0;width:100%;height:100%}
 .section-sub{font-size:16px;color:var(--muted);max-width:480px;line-height:1.7}
 .features-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-top:72px;align-items:center}
 .features-grid-rev{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-top:120px;align-items:center}
-.feature-visual{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;height:380px;position:relative}
 .feature-visual-inner{padding:22px;height:100%}
 .ticket-list{display:flex;flex-direction:column;gap:8px}
 .ticket-item{background:#090912;border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px}
@@ -180,6 +206,8 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
 </style>
 </head>
 <body>
+<div id="progress-bar"></div>
+<div id="mouse-glow"></div>
 
 <!-- NAV -->
 <nav>
@@ -197,10 +225,11 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
 
 <!-- HERO -->
 <section class="hero">
+  <div id="particles"></div>
   <div class="hero-glow"></div>
   <div class="hero-glow2"></div>
   <div class="badge"><span class="badge-dot"></span> PRIVATE · INVITE ONLY</div>
-  <h1>The Command Center<br/>for <span>Telegram</span> Businesses</h1>
+  <h1>The Command Center<br/>for <span id="typewriter"></span></h1>
   <p class="hero-sub">Manage tickets, track revenue, coordinate your team — all from one powerful dashboard built for Telegram-based service businesses.</p>
   <div class="hero-btns">
     <a href="https://t.me/yeyeyewepaid" target="_blank" class="btn-primary">✈ Request Access</a>
@@ -210,6 +239,7 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
   <!-- DASHBOARD MOCKUP -->
   <div class="mockup-wrap">
     <div class="mockup-glow"></div>
+    <div class="mockup-border">
     <div class="mockup">
       <div class="mockup-bar">
         <div class="dot dot-r"></div>
@@ -587,11 +617,31 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
           </div>
         </div>
       </div>
-    </div>
+    </div><!-- close mockup-border -->
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
+<!-- MARQUEE TICKER -->
+<div class="marquee-wrap">
+  <div class="marquee-track">
+    <span class="marquee-item"><span class="marquee-dot"></span>Real-time Operations</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Invite Only</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Telegram Powered</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Analytics Dashboard</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Ticket Management</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Revenue Tracking</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Multi-node Support</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Contractor Management</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Real-time Operations</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Invite Only</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Telegram Powered</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Analytics Dashboard</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Ticket Management</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Revenue Tracking</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Multi-node Support</span>
+    <span class="marquee-item"><span class="marquee-dot"></span>Contractor Management</span>
+  </div>
+</div>
 <section class="how" id="how">
   <div class="how-inner">
     <span class="section-label reveal" style="display:inline-block">How it works</span>
@@ -781,10 +831,80 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
   }, { threshold: 0.3 });
   document.querySelectorAll('.analytics-chart-mock').forEach(el => barsObserver.observe(el));
 
-  // ── INIT ──
+  // ── SCROLL PROGRESS BAR ──
+  const progressBar = document.getElementById('progress-bar');
+  window.addEventListener('scroll', () => {
+    const scrolled = window.scrollY;
+    const total = document.body.scrollHeight - window.innerHeight;
+    progressBar.style.width = (scrolled / total * 100) + '%';
+  });
+
+  // ── MOUSE GLOW ──
+  const glow = document.getElementById('mouse-glow');
+  document.addEventListener('mousemove', e => {
+    glow.style.left = e.clientX + 'px';
+    glow.style.top = e.clientY + 'px';
+  });
+
+  // ── FLOATING PARTICLES ──
+  (function() {
+    const container = document.getElementById('particles');
+    if (!container) return;
+    const colors = ['#7c5af0','#60a5fa','#34d398','#a78bfa'];
+    for (let i = 0; i < 28; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 3 + 1;
+      p.style.cssText = `
+        width:${size}px;height:${size}px;
+        left:${Math.random()*100}%;
+        bottom:${Math.random()*20}%;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        animation-duration:${Math.random()*12+8}s;
+        animation-delay:${Math.random()*8}s;
+      `;
+      container.appendChild(p);
+    }
+  })();
+
+  // ── TYPEWRITER ──
+  (function() {
+    const el = document.getElementById('typewriter');
+    if (!el) return;
+    const words = ['Telegram Businesses', 'Service Operators', 'Ticket Managers', 'Telegram Businesses'];
+    let wi = 0, ci = 0, deleting = false;
+    el.style.cssText = 'background:linear-gradient(135deg,#7c5af0,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;border-right:2px solid #7c5af0';
+    function type() {
+      const word = words[wi];
+      if (!deleting) {
+        el.textContent = word.slice(0, ++ci);
+        if (ci === word.length) { deleting = true; setTimeout(type, 2200); return; }
+      } else {
+        el.textContent = word.slice(0, --ci);
+        if (ci === 0) { deleting = false; wi = (wi + 1) % words.length; setTimeout(type, 300); return; }
+      }
+      setTimeout(type, deleting ? 40 : 80);
+    }
+    setTimeout(type, 1200);
+  })();
+
+  // ── TILT EFFECT ON FEATURE VISUALS ──
+  document.querySelectorAll('.feature-visual').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      card.style.transform = `perspective(800px) rotateY(${x * 8}deg) rotateX(${-y * 8}deg) scale(1.02)`;
+      card.style.boxShadow = `${-x * 20}px ${-y * 20}px 40px rgba(124,90,240,0.15)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'perspective(800px) rotateY(0) rotateX(0) scale(1)';
+      card.style.boxShadow = '';
+    });
+  });  // ── INIT ──
   window.addEventListener('load', () => {
     setTimeout(() => { animateChart(); runCountUps(); }, 800);
   });
-</script>
+
 </body>
 </html>
