@@ -2191,9 +2191,9 @@ export default function App() {
   );
 
   if (!user) {
-    // Show login page if ?login is in URL, otherwise redirect to landing
-    if (!window.location.search.includes('login')) {
-      window.location.href = '/landing.html';
+    const isLoginPage = window.location.search.includes('login') || window.location.hash.includes('login');
+    if (!isLoginPage) {
+      window.location.replace('/landing.html');
       return null;
     }
     return <LoginPage onLogin={(u) => { window.history.replaceState({}, '', '/'); setUser(u); }}/>;
