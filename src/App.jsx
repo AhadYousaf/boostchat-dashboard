@@ -148,7 +148,7 @@ const MiniChart = ({ data = [], color = "#6c4fd8", valueKey = "revenue" }) => {
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
 const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode }) => (
   <div style={S.topbar}>
-    <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); window.location.hash = "hub"; }}>
+    <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); }}>
       <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>⚡</div>
       <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>BoostChat</span>
     </div>
@@ -1303,8 +1303,8 @@ const RevoltSettingsTab = ({ node }) => {
 };
 
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
-const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
-  const [tab, setTab] = useState("overview");
+const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
+  const [tab, setTab] = useState(initialTab || "Node Overview");
   const [nodeData, setNodeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cutModal, setCutModal] = useState(false);
@@ -1394,7 +1394,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
 
       <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:"1px solid #1e1e2e" }}>
         {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t} onClick={() => { setTab(t); window.location.hash = 'node-detail:' + node.id + ':' + encodeURIComponent(t); }}
             style={{ padding:"8px 16px", border:"none", background:"transparent",
               color:tab===t?(tabColors[t]||"#a78bfa"):"#6060a0", cursor:"pointer", fontSize:13, fontWeight:700,
               borderBottom:tab===t?`2px solid ${tabColors[t]||"#a78bfa"}`:"2px solid transparent", marginBottom:-1, display:"flex", alignItems:"center", gap:6 }}>
@@ -2482,17 +2482,36 @@ const SettingsPage = ({ user }) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+
   const getInitialPage = () => {
     const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return 'node-detail';
     const validPages = ['hub','bots','nodes','node-detail','customers','tickets','analytics','settings','reports','logs','notifications'];
     return validPages.includes(hash) ? hash : 'hub';
   };
+  const getInitialNodeId = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return hash.split(':')[1] || null;
+    return null;
+  };
+  const getInitialNodeTab = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return decodeURIComponent(hash.split(':').slice(2).join(':') || 'Node Overview');
+    return 'Node Overview';
+  };
+
   const [page, setPageState] = useState(getInitialPage);
+  const [initialNodeId] = useState(getInitialNodeId);
+  const [initialNodeTab] = useState(getInitialNodeTab);
   const [selectedNode, setSelectedNode] = useState(null);
 
-  const setPage = (newPage) => {
+  const setPage = (newPage, nodeId, tab) => {
     setPageState(newPage);
-    window.location.hash = newPage;
+    if (newPage === 'node-detail' && nodeId) {
+      window.location.hash = 'node-detail:' + nodeId + ':' + encodeURIComponent(tab || 'Node Overview');
+    } else {
+      window.location.hash = newPage;
+    }
   };
   const [nodes, setNodes] = useState([]);
   const [nodesLoading, setNodesLoading] = useState(false);
@@ -2520,6 +2539,14 @@ export default function App() {
 
   useEffect(() => { loadNodes(); }, [loadNodes]);
 
+  // Restore selected node from URL hash after nodes load
+  useEffect(() => {
+    if (initialNodeId && nodes.length > 0 && !selectedNode) {
+      const found = nodes.find(n => n.id === initialNodeId);
+      if (found) setSelectedNode(found);
+    }
+  }, [nodes, initialNodeId]);
+
   const handleLogout = () => { localStorage.removeItem("oc_token"); setUser(null); setNodes([]); setPage("hub"); };
 
   const fullHeight = ["tickets","analytics","logs"].includes(page);
@@ -2538,7 +2565,7 @@ export default function App() {
       case "hub": return <HubPage user={user} nodes={nodes} setPage={setPage} setSelectedNode={setSelectedNode}/>;
       case "bots": return <BotsPage nodes={nodes} refreshNodes={loadNodes}/>;
       case "nodes": return <NodesPage nodes={nodes} nodesLoading={nodesLoading} refreshNodes={loadNodes} setSelectedNode={setSelectedNode} setPage={setPage}/>;
-      case "node-detail": return selectedNode?<NodeDetailPage node={selectedNode} setPage={setPage} refreshNodes={loadNodes}/>:null;
+      case "node-detail": return selectedNode?<NodeDetailPage node={selectedNode} setPage={setPage} refreshNodes={loadNodes} initialTab={initialNodeTab}/>:null;
       case "customers": return <CustomersPage selectedNode={selectedNode}/>;
       case "tickets": return <TicketsPage selectedNode={selectedNode}/>;
       case "analytics": return <AnalyticsPage selectedNode={selectedNode} nodes={nodes}/>;
