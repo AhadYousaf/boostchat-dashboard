@@ -146,9 +146,9 @@ const MiniChart = ({ data = [], color = "#6c4fd8", valueKey = "revenue" }) => {
 };
 
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
-const TopBar = ({ user, onLogout, showNotifs, setShowNotifs }) => (
+const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode }) => (
   <div style={S.topbar}>
-    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); window.location.hash = "hub"; }}>
       <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>⚡</div>
       <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>BoostChat</span>
     </div>
@@ -2482,8 +2482,18 @@ const SettingsPage = ({ user }) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [page, setPage] = useState("hub");
+  const getInitialPage = () => {
+    const hash = window.location.hash.replace('#', '');
+    const validPages = ['hub','bots','nodes','node-detail','customers','tickets','analytics','settings','reports','logs','notifications'];
+    return validPages.includes(hash) ? hash : 'hub';
+  };
+  const [page, setPageState] = useState(getInitialPage);
   const [selectedNode, setSelectedNode] = useState(null);
+
+  const setPage = (newPage) => {
+    setPageState(newPage);
+    window.location.hash = newPage;
+  };
   const [nodes, setNodes] = useState([]);
   const [nodesLoading, setNodesLoading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -2553,7 +2563,7 @@ export default function App() {
         button { font-family:inherit; }
         @keyframes spin { to { transform:rotate(360deg); } }
       `}</style>
-      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs}/>
+      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs} setPage={setPage} setSelectedNode={setSelectedNode}/>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <Sidebar page={page} setPage={setPage} nodes={nodes} nodesLoading={nodesLoading} selectedNode={selectedNode} setSelectedNode={setSelectedNode} collapsed={collapsed} setCollapsed={setCollapsed}/>
         <div style={{ flex:1, overflowY:fullHeight?"hidden":"auto", padding:fullHeight?0:"28px 32px", background:"#0d0d12", display:fullHeight?"flex":"block", flexDirection:fullHeight?"column":undefined }}>
