@@ -175,6 +175,8 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
 /* ── SCROLL REVEAL ── */
 .reveal{opacity:0;transform:translateY(32px);transition:opacity 0.7s ease,transform 0.7s ease}
 .reveal.visible{opacity:1;transform:translateY(0)}
+.mock-tab{cursor:pointer;transition:all 0.15s}
+.mock-panel{display:flex;flex-direction:column;gap:14px}
 </style>
 </head>
 <body>
@@ -226,13 +228,15 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
           <div class="sidebar-item"><div class="sidebar-dot"></div> Bots</div>
           <div class="sidebar-item"><div class="sidebar-dot"></div> Nodes</div>
           <div class="sidebar-section">Your Node</div>
-          <div class="sidebar-item"><div class="sidebar-dot"></div> Settings</div>
-          <div class="sidebar-item"><div class="sidebar-dot"></div> Customers</div>
-          <div class="sidebar-item"><div class="sidebar-dot"></div> Tickets</div>
-          <div class="sidebar-item active"><div class="sidebar-dot"></div> Analytics</div>
-          <div class="sidebar-item"><div class="sidebar-dot"></div> Reports</div>
+          <div class="sidebar-item mock-tab" data-tab="settings"><div class="sidebar-dot"></div> Settings</div>
+          <div class="sidebar-item mock-tab" data-tab="customers"><div class="sidebar-dot"></div> Customers</div>
+          <div class="sidebar-item mock-tab" data-tab="tickets"><div class="sidebar-dot"></div> Tickets</div>
+          <div class="sidebar-item mock-tab active" data-tab="analytics"><div class="sidebar-dot"></div> Analytics</div>
+          <div class="sidebar-item mock-tab" data-tab="reports"><div class="sidebar-dot"></div> Reports</div>
         </div>
         <div class="mockup-main">
+          <!-- ANALYTICS TAB -->
+          <div class="mock-panel" id="panel-analytics">
           <div class="mockup-header">
             <div class="mockup-title">Analytics</div>
             <div class="mockup-date">📅 Mar 1 — Mar 31, 2026</div>
@@ -240,15 +244,15 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
           <div class="kpi-row">
             <div class="kpi kpi-blue">
               <div class="kpi-label">Paid Tickets</div>
-              <div class="kpi-val"># 1,261</div>
+              <div class="kpi-val" data-count="1261" data-prefix="#"># <span class="countup">1,261</span></div>
             </div>
             <div class="kpi kpi-green">
               <div class="kpi-label">Revenue</div>
-              <div class="kpi-val">$ 42,385</div>
+              <div class="kpi-val" data-count="42385" data-prefix="$">$ <span class="countup">42,385</span></div>
             </div>
             <div class="kpi kpi-orange">
               <div class="kpi-label">Profits</div>
-              <div class="kpi-val">$ 4,010</div>
+              <div class="kpi-val" data-count="4010" data-prefix="$">$ <span class="countup">4,010</span></div>
             </div>
           </div>
           <div class="chart-area">
@@ -258,10 +262,13 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
                   <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.25"/>
                   <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
                 </linearGradient>
+                <clipPath id="reveal-clip">
+                  <rect id="clip-rect" x="0" y="0" width="0" height="110"/>
+                </clipPath>
               </defs>
-              <polygon points="0,110 0,75 60,60 120,65 180,40 240,50 300,25 360,15 420,30 480,20 540,35 600,10 660,25 720,15 800,5 800,110" fill="url(#g1)"/>
-              <polyline points="0,75 60,60 120,65 180,40 240,50 300,25 360,15 420,30 480,20 540,35 600,10 660,25 720,15 800,5" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linejoin="round"/>
-              <polyline points="0,100 60,97 120,99 180,88 240,93 300,83 360,80 420,86 480,82 540,87 600,76 660,82 720,78 800,72" fill="none" stroke="#34d398" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4 2"/>
+              <polygon points="0,110 0,75 60,60 120,65 180,40 240,50 300,25 360,15 420,30 480,20 540,35 600,10 660,25 720,15 800,5 800,110" fill="url(#g1)" clip-path="url(#reveal-clip)"/>
+              <polyline points="0,75 60,60 120,65 180,40 240,50 300,25 360,15 420,30 480,20 540,35 600,10 660,25 720,15 800,5" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linejoin="round" clip-path="url(#reveal-clip)"/>
+              <polyline points="0,100 60,97 120,99 180,88 240,93 300,83 360,80 420,86 480,82 540,87 600,76 660,82 720,78 800,72" fill="none" stroke="#34d398" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4 2" clip-path="url(#reveal-clip)"/>
             </svg>
           </div>
           <div class="table-area">
@@ -286,6 +293,78 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
               <div class="badge-pill pill-green">$ 3,723</div>
               <div class="badge-pill pill-orange">$ 372</div>
             </div>
+          </div>
+          </div>
+
+          <!-- TICKETS TAB -->
+          <div class="mock-panel" id="panel-tickets" style="display:none">
+          <div class="mockup-header">
+            <div class="mockup-title">Tickets</div>
+            <div style="display:flex;gap:6px">
+              <div style="background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.25);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;color:#60a5fa">All</div>
+              <div style="background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;color:var(--muted)">Open</div>
+              <div style="background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;color:var(--muted)">Paid</div>
+            </div>
+          </div>
+          <div id="live-ticket-list" style="display:flex;flex-direction:column;gap:7px;overflow:hidden;max-height:320px">
+            <div class="ticket-item"><div class="ticket-avatar" style="background:rgba(96,165,250,0.15);color:#60a5fa">JD</div><div class="ticket-info"><div class="ticket-name">@john_doe</div><div class="ticket-msg">Hey I sent the payment proof...</div></div><div class="ticket-meta"><div class="ticket-time">2m ago</div><div class="ticket-status status-pending">Pending</div></div></div>
+            <div class="ticket-item"><div class="ticket-avatar" style="background:rgba(52,211,152,0.15);color:#34d398">SM</div><div class="ticket-info"><div class="ticket-name">@sarah_m</div><div class="ticket-msg">Order confirmed ✓</div></div><div class="ticket-meta"><div class="ticket-time">8m ago</div><div class="ticket-status status-active">Active</div></div></div>
+            <div class="ticket-item"><div class="ticket-avatar" style="background:rgba(245,158,11,0.15);color:#f59e0b">AK</div><div class="ticket-info"><div class="ticket-name">@alex_k</div><div class="ticket-msg">Thanks! Got it 🙌</div></div><div class="ticket-meta"><div class="ticket-time">14m ago</div><div class="ticket-status status-paid">Paid $85</div></div></div>
+            <div class="ticket-item"><div class="ticket-avatar" style="background:rgba(168,139,250,0.15);color:#a78bfa">RT</div><div class="ticket-info"><div class="ticket-name">@ryan_t</div><div class="ticket-msg">Can I get a status update?</div></div><div class="ticket-meta"><div class="ticket-time">31m ago</div><div class="ticket-status status-active">Active</div></div></div>
+            <div class="ticket-item"><div class="ticket-avatar" style="background:rgba(240,78,74,0.15);color:#f87171">MK</div><div class="ticket-info"><div class="ticket-name">@mike_k</div><div class="ticket-msg">When will my order be ready?</div></div><div class="ticket-meta"><div class="ticket-time">45m ago</div><div class="ticket-status status-pending">Pending</div></div></div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+            <span style="font-size:11px;color:var(--muted)"><span id="ticket-count">5</span> shown / <span id="ticket-total">24</span> total</span>
+            <div style="display:flex;gap:4px">
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted)">‹</div>
+              <div style="background:rgba(124,90,240,0.15);border:1px solid rgba(124,90,240,0.3);border-radius:4px;padding:3px 8px;font-size:10px;color:#a78bfa;font-weight:700">1</div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted)">›</div>
+            </div>
+          </div>
+          </div>
+
+          <!-- CUSTOMERS TAB -->
+          <div class="mock-panel" id="panel-customers" style="display:none">
+          <div class="mockup-header">
+            <div class="mockup-title">Customers</div>
+            <div style="background:rgba(52,211,152,0.1);border:1px solid rgba(52,211,152,0.2);border-radius:6px;padding:4px 12px;font-size:11px;color:#34d398">247 total</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="background:#090912;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:grid;grid-template-columns:1fr 70px 80px 90px;align-items:center;gap:8px">
+              <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px">Customer</div>
+              <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px">Tickets</div>
+              <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px">Paid</div>
+              <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px">Revenue</div>
+            </div>
+            ${[['@john_doe','#60a5fa','# 14','# 12','$ 1,040'],['@sarah_m','#34d398','# 9','# 9','$ 765'],['@alex_k','#f59e0b','# 22','# 18','$ 2,340'],['@ryan_t','#a78bfa','# 6','# 5','$ 425'],['@mike_k','#f87171','# 3','# 2','$ 170']].map(([name,color,t,p,r])=>`
+            <div style="background:#090912;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:grid;grid-template-columns:1fr 70px 80px 90px;align-items:center;gap:8px">
+              <div style="font-size:12px;color:${color};font-weight:600">${name}</div>
+              <div class="badge-pill pill-blue">${t}</div>
+              <div class="badge-pill pill-orange">${p}</div>
+              <div class="badge-pill pill-green">${r}</div>
+            </div>`).join('')}
+          </div>
+          </div>
+
+          <!-- SETTINGS/REPORTS fallback -->
+          <div class="mock-panel" id="panel-settings" style="display:none">
+          <div class="mockup-header"><div class="mockup-title">Node Settings</div></div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+            ${[['Telegram','✈','#60a5fa','Bot connected · polling active'],['BoostChat','⚡','#a78bfa','Revolt server linked · 3 categories'],['Webapp','🌐','#34d398','Coming soon'],['Accounting','💰','#f59e0b','2 contractors · 10% default cut']].map(([t,ic,c,d])=>`
+            <div style="background:#090912;border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+              <div style="width:32px;height:32px;border-radius:8px;background:${c}22;border:1px solid ${c}44;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${ic}</div>
+              <div><div style="font-size:12px;font-weight:700;color:${c}">${t}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${d}</div></div>
+              <div style="margin-left:auto;background:transparent;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:10px;color:var(--muted)">···</div>
+            </div>`).join('')}
+          </div>
+          </div>
+
+          <div class="mock-panel" id="panel-reports" style="display:none">
+          <div class="mockup-header"><div class="mockup-title">Reports</div></div>
+          <div style="display:flex;align-items:center;justify-content:center;height:300px;flex-direction:column;gap:12px;color:var(--muted)">
+            <div style="font-size:40px;opacity:0.3">📊</div>
+            <div style="font-size:13px">Report generation</div>
+          </div>
           </div>
         </div>
       </div>
@@ -527,11 +606,13 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
 </footer>
 
 <script>
+  // ── SCROLL REVEAL ──
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
   }, { threshold: 0.1 });
   document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
+  // ── SMOOTH NAV LINKS ──
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {
       const target = document.querySelector(a.getAttribute('href'));
@@ -539,9 +620,133 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
     });
   });
 
+  // ── NAV SCROLL ──
   const nav = document.querySelector('nav');
   window.addEventListener('scroll', () => {
     nav.style.borderBottomColor = window.scrollY > 50 ? 'rgba(124,90,240,0.15)' : 'rgba(124,90,240,0.08)';
+  });
+
+  // ── CHART LINE DRAW ANIMATION ──
+  function animateChart() {
+    const clipRect = document.getElementById('clip-rect');
+    if (!clipRect) return;
+    clipRect.setAttribute('width', '0');
+    let start = null;
+    const duration = 1400;
+    function step(ts) {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      clipRect.setAttribute('width', eased * 800);
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ── COUNT-UP ANIMATION ──
+  function countUp(el, target, duration) {
+    let start = null;
+    function step(ts) {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const val = Math.floor(eased * target);
+      el.textContent = val.toLocaleString();
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function runCountUps() {
+    document.querySelectorAll('.countup').forEach(el => {
+      const parent = el.closest('[data-count]');
+      if (parent) countUp(el, parseInt(parent.dataset.count), 1600);
+    });
+  }
+
+  // ── TAB SWITCHER ──
+  const tabMap = {
+    analytics: 'panel-analytics',
+    tickets: 'panel-tickets',
+    customers: 'panel-customers',
+    settings: 'panel-settings',
+    reports: 'panel-reports'
+  };
+
+  function switchTab(tabName) {
+    // Update sidebar
+    document.querySelectorAll('.mock-tab').forEach(t => {
+      const active = t.dataset.tab === tabName;
+      t.classList.toggle('active', active);
+    });
+    // Show/hide panels
+    Object.entries(tabMap).forEach(([key, panelId]) => {
+      const panel = document.getElementById(panelId);
+      if (panel) panel.style.display = key === tabName ? 'flex' : 'none';
+      if (panel && key === tabName) panel.style.flexDirection = 'column';
+    });
+    // Animate chart when analytics tab shown
+    if (tabName === 'analytics') {
+      setTimeout(animateChart, 100);
+      setTimeout(runCountUps, 100);
+    }
+  }
+
+  document.querySelectorAll('.mock-tab').forEach(tab => {
+    tab.style.cursor = 'pointer';
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  // ── LIVE TICKET FEED (on tickets tab) ──
+  const fakeTickets = [
+    { init: 'NB', color: '#34d398', bg: 'rgba(52,211,152,0.15)', name: '@nova_b', msg: 'I need help with my order 🙏', status: 'Pending', statusClass: 'status-pending' },
+    { init: 'CL', color: '#60a5fa', bg: 'rgba(96,165,250,0.15)', name: '@chris_l', msg: 'Payment sent! Check please', status: 'Pending', statusClass: 'status-pending' },
+    { init: 'ZM', color: '#a78bfa', bg: 'rgba(168,139,250,0.15)', name: '@zara_m', msg: 'All done, thank you! ⭐', status: 'Paid $120', statusClass: 'status-paid' },
+    { init: 'TK', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', name: '@tom_k', msg: 'Can I change my order?', status: 'Active', statusClass: 'status-active' },
+    { init: 'ER', color: '#f87171', bg: 'rgba(240,78,74,0.15)', name: '@emma_r', msg: 'Is there a delay today?', status: 'Pending', statusClass: 'status-pending' },
+  ];
+  let fakeIdx = 0;
+  let totalCount = 24;
+
+  function addLiveTicket() {
+    if (document.getElementById('panel-tickets').style.display === 'none') return;
+    const t = fakeTickets[fakeIdx % fakeTickets.length];
+    fakeIdx++;
+    totalCount++;
+    const list = document.getElementById('live-ticket-list');
+    const totalEl = document.getElementById('ticket-total');
+    if (totalEl) totalEl.textContent = totalCount;
+    const item = document.createElement('div');
+    item.className = 'ticket-item';
+    item.style.cssText = 'opacity:0;transform:translateY(-10px);transition:all 0.4s ease';
+    item.innerHTML = `<div class="ticket-avatar" style="background:${t.bg};color:${t.color}">${t.init}</div><div class="ticket-info"><div class="ticket-name">${t.name}</div><div class="ticket-msg">${t.msg}</div></div><div class="ticket-meta"><div class="ticket-time">just now</div><div class="ticket-status ${t.statusClass}">${t.status}</div></div>`;
+    list.insertBefore(item, list.firstChild);
+    requestAnimationFrame(() => { item.style.opacity = '1'; item.style.transform = 'translateY(0)'; });
+    // remove last if too many
+    while (list.children.length > 6) list.removeChild(list.lastChild);
+  }
+
+  setInterval(addLiveTicket, 3200);
+
+  // ── ANIMATE BARS ON SCROLL ──
+  const barsObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.querySelectorAll('.bar').forEach((bar, i) => {
+          const h = bar.style.height;
+          bar.style.height = '0%';
+          bar.style.transition = `height 0.6s cubic-bezier(0.34,1.56,0.64,1) ${i * 80}ms`;
+          setTimeout(() => { bar.style.height = h; }, 50);
+        });
+        barsObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.3 });
+  document.querySelectorAll('.analytics-chart-mock').forEach(el => barsObserver.observe(el));
+
+  // ── INIT ──
+  window.addEventListener('load', () => {
+    setTimeout(() => { animateChart(); runCountUps(); }, 800);
   });
 </script>
 </body>
