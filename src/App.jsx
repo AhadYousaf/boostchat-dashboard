@@ -2037,167 +2037,365 @@ const TicketsPage = ({ selectedNode }) => {
   );
 };
 
-// ─── ANALYTICS PAGE ───────────────────────────────────────────────────────────
-const AnalyticsPage = ({ selectedNode, nodes }) => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("30");
-  const targetNode = selectedNode || nodes[0];
-
-  useEffect(() => {
-    if (!targetNode) return;
-    const load = async () => {
-      setLoading(true);
-      try { const res = await api(`/analytics/${targetNode.id}?period=${period}`); setData(res); }
-      catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    };
-    load();
-  }, [targetNode, period]);
-
-  if (!targetNode) return (
-    <div style={{ padding:"48px", textAlign:"center", color:"#4040a0" }}>
-      <div style={{ fontSize:14, fontWeight:700 }}>No nodes yet</div>
+// ─── INTERACTIVE CHART ───────────────────────────────────────────────────────
+const InteractiveChart = ({ data = [], height = 220 }) => {
+  const [hover, setHover] = useState(null);
+  if (!data.length) return <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:12 }}>No data yet</div>;
+  const maxRev = Math.max(...data.map(d => parseFloat(d.revenue)||0), 1);
+  const w = 800, h = height, pad = 40;
+  const revPts = data.map((d,i) => ({ x:(i/(data.length-1||1))*(w-pad*2)+pad, y:h-pad-(parseFloat(d.revenue||0)/maxRev)*(h-pad*2), d }));
+  const proPts = data.map((d,i) => ({ x:(i/(data.length-1||1))*(w-pad*2)+pad, y:h-pad-(parseFloat(d.profit||0)/maxRev)*(h-pad*2), d }));
+  const revPath = revPts.map((p,i) => `${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
+  const proPath = proPts.map((p,i) => `${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
+  const revFill = `${revPath} L${revPts[revPts.length-1].x},${h-pad} L${pad},${h-pad} Z`;
+  const yLabels = [0,0.25,0.5,0.75,1].map(t => ({ y:h-pad-(t*(h-pad*2)), label:`$${(maxRev*t).toFixed(0)}` }));
+  const step = Math.max(1, Math.floor(data.length/6));
+  return (
+    <div style={{ position:"relative" }}>
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width:"100%", height }} preserveAspectRatio="none" onMouseLeave={() => setHover(null)}>
+        <defs>
+          <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.35"/>
+            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.02"/>
+          </linearGradient>
+        </defs>
+        {yLabels.map((l,i) => <line key={i} x1={pad} y1={l.y} x2={w-pad} y2={l.y} stroke="#1e1e2e" strokeWidth="1"/>)}
+        <path d={revFill} fill="url(#revFill)"/>
+        <path d={revPath} fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinejoin="round"/>
+        <path d={proPath} fill="none" stroke="#34d398" strokeWidth="2" strokeLinejoin="round" strokeDasharray="6 3"/>
+        {revPts.map((p,i) => (
+          <rect key={i} x={p.x-((w-pad*2)/(data.length*2))} y={pad} width={(w-pad*2)/data.length} height={h-pad*2}
+            fill="transparent" style={{ cursor:"crosshair" }}
+            onMouseEnter={() => setHover({ ...p.d, px:p.x/w*100 })}/>
+        ))}
+        {hover && (() => { const pt = revPts.find(p => p.d.date===hover.date); return pt ? <circle cx={pt.x} cy={pt.y} r="5" fill="#60a5fa" stroke="#fff" strokeWidth="2"/> : null; })()}
+        {yLabels.map((l,i) => <text key={i} x={pad-4} y={l.y+4} textAnchor="end" fontSize="9" fill="#5a5a80">{l.label}</text>)}
+        {data.map((d,i) => i%step===0 ? <text key={i} x={revPts[i]?.x} y={h-8} textAnchor="middle" fontSize="9" fill="#5a5a80">{new Date(d.date).toLocaleDateString([],{month:'short',day:'numeric'})}</text> : null)}
+      </svg>
+      {hover && (
+        <div style={{ position:"absolute", top:20, left:`${Math.min(Math.max(hover.px,10),75)}%`, transform:"translateX(-50%)",
+          background:"#16161f", border:"1px solid #2a2a3e", borderRadius:8, padding:"8px 14px", fontSize:12,
+          pointerEvents:"none", whiteSpace:"nowrap", zIndex:20, boxShadow:"0 8px 24px #00000080" }}>
+          <div style={{ fontWeight:700, color:"#e2e2f0", marginBottom:6 }}>{new Date(hover.date).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</div>
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+            <span style={{ width:8, height:8, borderRadius:"50%", background:"#60a5fa", display:"inline-block" }}/>
+            <span style={{ color:"#9090b8" }}>Revenue:</span>
+            <span style={{ color:"#60a5fa", fontWeight:700 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ width:8, height:8, borderRadius:"50%", background:"#34d398", display:"inline-block" }}/>
+            <span style={{ color:"#9090b8" }}>Profits:</span>
+            <span style={{ color:"#34d398", fontWeight:700 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+// ─── DATE RANGE PICKER ────────────────────────────────────────────────────────
+const DateRangePicker = ({ startDate, endDate, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [tempStart, setTempStart] = useState(startDate);
+  const [tempEnd, setTempEnd] = useState(endDate);
+  const [viewMonth, setViewMonth] = useState(new Date(startDate));
+  const fmt = (d) => d ? new Date(d).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '—';
+  const presets = [
+    { label:'Today', start:new Date(new Date().setHours(0,0,0,0)), end:new Date() },
+    { label:'Yesterday', start:new Date(new Date().setDate(new Date().getDate()-1)), end:new Date(new Date().setDate(new Date().getDate()-1)) },
+    { label:'Last 7 Days', start:new Date(new Date().setDate(new Date().getDate()-7)), end:new Date() },
+    { label:'Last 30 Days', start:new Date(new Date().setDate(new Date().getDate()-30)), end:new Date() },
+    { label:'This Month', start:new Date(new Date().getFullYear(),new Date().getMonth(),1), end:new Date(new Date().getFullYear(),new Date().getMonth()+1,0) },
+    { label:'Last Month', start:new Date(new Date().getFullYear(),new Date().getMonth()-1,1), end:new Date(new Date().getFullYear(),new Date().getMonth(),0) },
+    { label:'Last 3 Months', start:new Date(new Date().getFullYear(),new Date().getMonth()-3,1), end:new Date() },
+    { label:'Last 6 Months', start:new Date(new Date().getFullYear(),new Date().getMonth()-6,1), end:new Date() },
+  ];
+  const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
+  const firstDayOfMonth = (y,m) => new Date(y,m,1).getDay();
+  const isSame = (a,b) => a && b && new Date(a).toDateString()===new Date(b).toDateString();
+  const isBetween = (d,s,e) => s && e && new Date(d)>=new Date(s) && new Date(d)<=new Date(e);
+  const renderCal = (year, month) => {
+    const days = daysInMonth(year,month), first = firstDayOfMonth(year,month), cells = [];
+    for(let i=0;i<first;i++) cells.push(null);
+    for(let d=1;d<=days;d++) cells.push(new Date(year,month,d));
+    return cells;
+  };
+  const vm2 = new Date(viewMonth.getFullYear(), viewMonth.getMonth()+1, 1);
+  return (
+    <div style={{ position:"relative" }}>
+      <button onClick={() => setOpen(!open)}
+        style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1e2e", border:"1px solid #2a2a3e",
+          borderRadius:8, padding:"6px 14px", color:"#a78bfa", cursor:"pointer", fontSize:12, fontWeight:600 }}>
+        📅 {fmt(startDate)} — {fmt(endDate)} ▾
+      </button>
+      {open && (
+        <div style={{ position:"absolute", top:40, left:0, background:"#16161f", border:"1px solid #2a2a3e",
+          borderRadius:12, zIndex:100, boxShadow:"0 20px 60px #00000090", display:"flex", minWidth:620 }}
+          onClick={e=>e.stopPropagation()}>
+          <div style={{ width:140, borderRight:"1px solid #1e1e2e", padding:"12px 8px" }}>
+            {presets.map(p => (
+              <button key={p.label} onClick={() => { setTempStart(p.start); setTempEnd(p.end); setViewMonth(new Date(p.start)); }}
+                style={{ width:"100%", textAlign:"left", background:"transparent", border:"none",
+                  cursor:"pointer", padding:"6px 10px", borderRadius:6, fontSize:12,
+                  fontWeight:fmt(tempStart)===fmt(p.start)?700:400,
+                  color:fmt(tempStart)===fmt(p.start)?"#a78bfa":"#c0c0e0" }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ padding:"16px", flex:1 }}>
+            <div style={{ display:"flex", gap:24 }}>
+              {[viewMonth, vm2].map((vm,ci) => {
+                const y=vm.getFullYear(), m=vm.getMonth(), cells=renderCal(y,m);
+                return (
+                  <div key={ci} style={{ flex:1 }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                      {ci===0 ? <button onClick={() => setViewMonth(new Date(y,m-1,1))} style={{ background:"transparent", border:"none", color:"#6060a0", cursor:"pointer", fontSize:16 }}>‹</button> : <div/>}
+                      <span style={{ fontSize:13, fontWeight:700, color:"#e2e2f0" }}>{vm.toLocaleDateString([],{month:'long'})} {y}</span>
+                      {ci===1 ? <button onClick={() => setViewMonth(new Date(y,m+1,1))} style={{ background:"transparent", border:"none", color:"#6060a0", cursor:"pointer", fontSize:16 }}>›</button> : <div/>}
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2, marginBottom:4 }}>
+                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} style={{ textAlign:"center", fontSize:10, color:"#5a5a80", padding:"2px 0" }}>{d}</div>)}
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
+                      {cells.map((d,i) => {
+                        if(!d) return <div key={i}/>;
+                        const isStart=isSame(d,tempStart), isEnd=isSame(d,tempEnd), inRange=isBetween(d,tempStart,tempEnd);
+                        return (
+                          <button key={i} onClick={() => {
+                            if(!tempStart||(tempStart&&tempEnd)){setTempStart(d);setTempEnd(null);}
+                            else if(d<tempStart){setTempEnd(tempStart);setTempStart(d);}
+                            else{setTempEnd(d);}
+                          }}
+                            style={{ padding:"5px 0", textAlign:"center", borderRadius:6, border:"none", cursor:"pointer", fontSize:12,
+                              fontWeight:isStart||isEnd?700:400,
+                              background:isStart||isEnd?"#7c5af0":inRange?"#7c5af022":"transparent",
+                              color:isStart||isEnd?"#fff":inRange?"#a78bfa":"#c0c0e0" }}>
+                            {d.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:16, paddingTop:12, borderTop:"1px solid #1e1e2e" }}>
+              <button onClick={() => { setTempStart(startDate); setTempEnd(endDate); setOpen(false); }} style={{ ...S.btnOutline, fontSize:12 }}>Cancel</button>
+              <button onClick={() => { setTempStart(null); setTempEnd(null); }} style={{ background:"#e05050", border:"none", borderRadius:8, padding:"6px 14px", color:"#fff", cursor:"pointer", fontSize:12 }}>Clear 🗑</button>
+              <button onClick={() => { if(tempStart&&tempEnd){ onChange(tempStart,tempEnd); setOpen(false); } }} style={{ ...S.btn(), fontSize:12 }}>Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── ANALYTICS PAGE ───────────────────────────────────────────────────────────
+const AnalyticsPage = ({ selectedNode, nodes }) => {
+  const now = new Date();
+  const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const defaultEnd = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [chartTab, setChartTab] = useState("revenue");
+  const [svcPage, setSvcPage] = useState(1);
+  const [ctrPage, setCtrPage] = useState(1);
+  const perPage = 10;
+  const targetNode = selectedNode || nodes[0];
+
+  const load = useCallback(async () => {
+    if (!targetNode) return;
+    setLoading(true);
+    try {
+      const s = startDate.toISOString().split('T')[0];
+      const e = endDate.toISOString().split('T')[0];
+      const res = await api(`/analytics/${targetNode.id}?start=${s}&end=${e}`);
+      setData(res);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, [targetNode, startDate, endDate]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!targetNode) return <div style={{ padding:"48px", textAlign:"center", color:"#4040a0" }}><div style={{ fontSize:14, fontWeight:700 }}>No nodes yet</div></div>;
 
   const ov = data?.overview || {};
+  const services = data?.services || [];
+  const workers = data?.workers || [];
+  const daily = data?.daily || [];
+  const topCustomers = data?.top_customers || [];
+  const totalRevenue = parseFloat(ov.total_revenue||0);
+  const totalPaidTickets = parseInt(ov.paid_tickets||0);
+  const totalProfits = workers.reduce((sum,w) => sum + (parseFloat(w.revenue||0)*(parseFloat(w.cut_percentage||0)/100)), 0);
+  const dailyWithProfit = daily.map(d => ({ ...d, profit: parseFloat(d.revenue||0) * (totalProfits/(totalRevenue||1)) }));
+  const svcPages = Math.ceil(services.length/perPage);
+  const ctrPages = Math.ceil(workers.length/perPage);
+  const svcSlice = services.slice((svcPage-1)*perPage, svcPage*perPage);
+  const ctrSlice = workers.slice((ctrPage-1)*perPage, ctrPage*perPage);
+
+  const Badge = ({ value, color }) => (
+    <span style={{ background:color+"22", color, border:`1px solid ${color}44`, borderRadius:6, padding:"3px 10px", fontSize:11, fontWeight:700, whiteSpace:"nowrap" }}>{value}</span>
+  );
+
+  const Pagination = ({ page, pages, setPage }) => {
+    if (pages <= 1) return null;
+    return (
+      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+        <button onClick={() => setPage(1)} disabled={page===1} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>«</button>
+        <button onClick={() => setPage(p=>Math.max(1,p-1))} disabled={page===1} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>‹</button>
+        {Array.from({length:pages},(_,i)=>i+1).map(n => (
+          <button key={n} onClick={() => setPage(n)}
+            style={{ background:page===n?"#6c4fd833":"transparent", border:`1px solid ${page===n?"#6c4fd8":"#2a2a3e"}`,
+              borderRadius:4, padding:"2px 8px", color:page===n?"#a78bfa":"#9090b8", cursor:"pointer", fontSize:12, fontWeight:page===n?700:400, minWidth:28 }}>{n}</button>
+        ))}
+        <button onClick={() => setPage(p=>Math.min(pages,p+1))} disabled={page>=pages} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=pages?0.4:1 }}>›</button>
+        <button onClick={() => setPage(pages)} disabled={page>=pages} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=pages?0.4:1 }}>»</button>
+      </div>
+    );
+  };
 
   return (
     <div style={{ height:"100%", overflow:"auto" }}>
-      {/* Header */}
-      <div style={{ padding:"12px 24px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0d0d12", zIndex:10 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:13, color:"#6060a0" }}>Analytics for</span>
-          <span style={{ fontWeight:700, fontSize:14 }}>{targetNode.name}</span>
-        </div>
-        <select value={period} onChange={e => setPeriod(e.target.value)}
-          style={{ ...S.input, width:"auto", padding:"4px 10px", fontSize:12 }}>
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-          <option value="90">Last 90 days</option>
-        </select>
+      <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, background:"#0d0d12", zIndex:10, flexWrap:"wrap" }}>
+        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s,e) => { setStartDate(s); setEndDate(e); setSvcPage(1); setCtrPage(1); }}/>
+        <span style={{ fontSize:12, color:"#5a5a80" }}>compared to previous period</span>
+        <div style={{ marginLeft:"auto" }}><span style={{ fontSize:11, color:"#5a5a80" }}>Showing results from {nodes.length} bot{nodes.length!==1?"s":""}</span></div>
       </div>
-
       {loading ? (
-        <div style={{ padding:"48px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}>
-          <Spinner/> Loading analytics...
-        </div>
+        <div style={{ padding:"48px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading analytics...</div>
       ) : (
-        <div style={{ padding:"24px" }}>
-          {/* Top stats */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:24 }}>
+        <div style={{ padding:"20px 22px" }}>
+          <div style={{ fontSize:11, color:"#5a5a80", fontWeight:600, marginBottom:4 }}>Analytics</div>
+          <div style={{ fontSize:12, color:"#4a4a70", marginBottom:16 }}>View your analytics and statistics for your bots and webapps.</div>
+          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
             {[
-              { label:"TOTAL TICKETS", value:`${ov.total_tickets||0}`, color:"#60a5fa", icon:"🎫" },
-              { label:"TOTAL REVENUE", value:`$${parseFloat(ov.total_revenue||0).toFixed(2)}`, color:"#34d398", icon:"💰" },
-              { label:"PAID TICKETS", value:`${ov.paid_tickets||0}`, color:"#f59e0b", icon:"✅" },
+              { label:"PAID TICKETS", value:`# ${totalPaidTickets.toLocaleString()}`, color:"#60a5fa" },
+              { label:"REVENUE", value:`$ ${totalRevenue.toFixed(2)}`, color:"#34d398" },
+              { label:"PROFITS", value:`$ ${totalProfits.toFixed(2)}`, color:"#f59e0b" },
             ].map((s,i) => (
-              <div key={i} style={{ ...S.card, padding:"20px 24px", position:"relative", overflow:"hidden" }}>
-                <div style={{ position:"absolute", right:16, top:16, fontSize:32, opacity:0.1 }}>{s.icon}</div>
-                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
-                <div style={{ fontSize:30, fontWeight:900, color:s.color }}>{s.value}</div>
+              <div key={i} style={{ flex:1, background:s.color+"22", border:`1px solid ${s.color}44`, borderRadius:10, padding:"18px 22px", position:"relative", overflow:"hidden", minWidth:0 }}>
+                <div style={{ position:"absolute", right:16, top:12, fontSize:48, opacity:0.1, fontWeight:900, color:s.color }}>{i===0?"#":"$"}</div>
+                <div style={{ fontSize:9, color:s.color+"cc", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>{s.label}</div>
+                <div style={{ fontSize:34, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
               </div>
             ))}
           </div>
-
-          {/* Revenue chart */}
-          <div style={{ ...S.card, marginBottom:24 }}>
-            <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <span style={{ fontWeight:700, fontSize:13 }}>Revenue over time</span>
-              <span style={{ fontSize:16, fontWeight:900, color:"#34d398" }}>${parseFloat(ov.total_revenue||0).toFixed(2)}</span>
+          <div style={{ ...S.card, marginBottom:20 }}>
+            <div style={{ padding:"10px 18px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:2 }}>
+              {[["revenue","📈 Revenue/Profits"],["tickets","🎫 Tickets"],["platform","🌐 Platform"]].map(([id,label]) => (
+                <button key={id} onClick={() => setChartTab(id)}
+                  style={{ background:"transparent", border:"none", padding:"4px 14px", fontSize:12, fontWeight:chartTab===id?700:400, color:chartTab===id?"#a78bfa":"#6060a0", cursor:"pointer", borderBottom:chartTab===id?"2px solid #a78bfa":"2px solid transparent", marginBottom:-1 }}>
+                  {label}
+                </button>
+              ))}
+              <div style={{ marginLeft:"auto", fontSize:14, fontWeight:800, color:"#34d398" }}>${totalRevenue.toFixed(2)}</div>
             </div>
-            <div style={{ padding:"16px 20px" }}>
-              <MiniChart data={data?.daily||[]} color="#60a5fa" valueKey="revenue"/>
-              {!data?.daily?.length && <div style={{ textAlign:"center", color:"#4040a0", fontSize:13, marginTop:8 }}>No data for this period.</div>}
-            </div>
-          </div>
-
-          {/* Services + Workers */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:24 }}>
-            {/* Services */}
-            <div style={S.card}>
-              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>🛎 Top Services</div>
-              {!data?.services?.length ? (
-                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No service data yet.</div>
-              ) : (
-                <div style={{ overflowX:"auto" }}>
-                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                        {["Service","Tickets","Revenue"].map(h => (
-                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.services.map((s,i) => (
-                        <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
-                          <td style={{ padding:"8px 12px", fontSize:12, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{s.service_name}</td>
-                          <td style={{ padding:"8px 12px" }}>
-                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{s.tickets}</span>
-                          </td>
-                          <td style={{ padding:"8px 12px" }}>
-                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(s.revenue).toFixed(2)}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Workers */}
-            <div style={S.card}>
-              <div style={{ padding:"12px 16px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>👥 Workers</div>
-              {!data?.workers?.length ? (
-                <div style={{ padding:"20px", color:"#4040a0", fontSize:13 }}>No worker data yet.</div>
-              ) : (
-                <div style={{ overflowX:"auto" }}>
-                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                        {["Worker","Tickets","Revenue","Cut"].map(h => (
-                          <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:10, color:"#6060a0", fontWeight:700 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.workers.map((w,i) => (
-                        <tr key={i} style={{ borderBottom:"1px solid #1a1a2a" }}>
-                          <td style={{ padding:"8px 12px", fontSize:12 }}>{w.username}</td>
-                          <td style={{ padding:"8px 12px" }}>
-                            <span style={{ background:"#60a5fa22", color:"#60a5fa", border:"1px solid #60a5fa44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>{w.tickets}</span>
-                          </td>
-                          <td style={{ padding:"8px 12px" }}>
-                            <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>${parseFloat(w.revenue).toFixed(2)}</span>
-                          </td>
-                          <td style={{ padding:"8px 12px" }}>
-                            <span style={{ background:"#f59e0b22", color:"#f59e0b", border:"1px solid #f59e0b44", borderRadius:4, padding:"1px 7px", fontSize:10, fontWeight:600 }}>
-                              ${(parseFloat(w.revenue) * (w.cut_percentage||0) / 100).toFixed(2)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <div style={{ padding:"8px 18px 12px" }}>
+              <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600, padding:"6px 0 4px" }}>Revenue/Profits</div>
+              <InteractiveChart data={dailyWithProfit} height={220}/>
             </div>
           </div>
-
-          {/* Bottom stats */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
+            <div style={S.card}>
+              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
+                <span>🛎</span><span style={{ fontWeight:700, fontSize:13 }}>Services</span>
+              </div>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                  <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>SERVICE</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
+                </tr></thead>
+                <tbody>
+                  {!svcSlice.length ? <tr><td colSpan={4} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No service data yet.</td></tr>
+                  : svcSlice.map((s,i) => (
+                    <tr key={i} style={{ borderBottom:"1px solid #191926" }} onMouseEnter={e=>e.currentTarget.style.background="#16161f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      <td style={{ padding:"8px 12px", fontSize:12, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.service_name}</td>
+                      <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`# ${s.tickets}`} color="#60a5fa"/></td>
+                      <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${parseFloat(s.revenue).toFixed(2)}`} color="#34d398"/></td>
+                      <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${(parseFloat(s.revenue)*0.1).toFixed(2)}`} color="#f59e0b"/></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ padding:"8px 12px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:11, color:"#5a5a80" }}>{services.length} total</span>
+                <Pagination page={svcPage} pages={svcPages} setPage={setSvcPage}/>
+              </div>
+            </div>
+            <div style={S.card}>
+              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
+                <span>👤</span><span style={{ fontWeight:700, fontSize:13 }}>Contractors</span>
+              </div>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                  <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CONTRACTOR</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUT</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
+                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
+                </tr></thead>
+                <tbody>
+                  {!ctrSlice.length ? <tr><td colSpan={5} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No contractor data yet.</td></tr>
+                  : ctrSlice.map((w,i) => {
+                    const profit = parseFloat(w.revenue||0)*(parseFloat(w.cut_percentage||0)/100);
+                    return (
+                      <tr key={i} style={{ borderBottom:"1px solid #191926" }} onMouseEnter={e=>e.currentTarget.style.background="#16161f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <td style={{ padding:"8px 12px", fontSize:12, fontWeight:600 }}>{w.username}</td>
+                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`% ${w.cut_percentage||0}`} color="#e05050"/></td>
+                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`# ${w.tickets}`} color="#60a5fa"/></td>
+                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${parseFloat(w.revenue).toFixed(2)}`} color="#34d398"/></td>
+                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${profit.toFixed(2)}`} color="#f59e0b"/></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{ padding:"8px 12px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:11, color:"#5a5a80" }}>{workers.length} total</span>
+                <Pagination page={ctrPage} pages={ctrPages} setPage={setCtrPage}/>
+              </div>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
             {[
-              { label:"UNIQUE CUSTOMERS", value:`${ov.unique_customers||0}`, color:"#e05050" },
-              { label:"AVG REVENUE / CUSTOMER", value:`$${ov.unique_customers ? ((ov.total_revenue||0)/ov.unique_customers).toFixed(2) : "0.00"}`, color:"#f87171" },
-              { label:"COMPLETION RATE", value:`${ov.paid_tickets&&ov.total_tickets ? (((ov.paid_tickets/ov.total_tickets)*100).toFixed(0)) : "0"}%`, color:"#c084fc" },
+              { label:"RETURNING CUSTOMERS", value:`# ${ov.returning_customers||0}`, color:"#e05050" },
+              { label:"AVERAGE REVENUE / CUSTOMER", value:`$ ${ov.unique_customers ? (totalRevenue/parseInt(ov.unique_customers)).toFixed(0) : "0"}`, color:"#f87171" },
+              { label:"CUSTOMER RETENTION RATE", value:`% ${ov.paid_tickets&&ov.total_tickets ? ((parseInt(ov.paid_tickets)/parseInt(ov.total_tickets))*100).toFixed(0) : "0"}`, color:"#c084fc" },
             ].map((s,i) => (
-              <div key={i} style={{ ...S.card, padding:"16px 20px" }}>
-                <div style={{ fontSize:10, color:s.color+"88", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
-                <div style={{ fontSize:26, fontWeight:900, color:s.color }}>{s.value}</div>
+              <div key={i} style={{ flex:1, background:s.color+"22", border:`1px solid ${s.color}44`, borderRadius:10, padding:"18px 22px", position:"relative", overflow:"hidden", minWidth:0 }}>
+                <div style={{ position:"absolute", right:16, top:12, fontSize:48, opacity:0.08, color:s.color, fontWeight:900 }}>{i===0?"↩":i===1?"$":"%"}</div>
+                <div style={{ fontSize:9, color:s.color+"cc", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>{s.label}</div>
+                <div style={{ fontSize:34, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
               </div>
             ))}
+          </div>
+          <div style={S.card}>
+            <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
+              <span>🏆</span><span style={{ fontWeight:700, fontSize:13 }}>Top Customers</span>
+            </div>
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+              <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
+                <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUSTOMER</th>
+                <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS CREATED</th>
+                <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
+              </tr></thead>
+              <tbody>
+                {!topCustomers.length ? <tr><td colSpan={3} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No customer data yet.</td></tr>
+                : topCustomers.slice(0,10).map((c,i) => (
+                  <tr key={i} style={{ borderBottom:"1px solid #191926" }} onMouseEnter={e=>e.currentTarget.style.background="#16161f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <td style={{ padding:"8px 12px", fontSize:12, color:"#60a5fa" }}>{c.username ? `@${c.username}` : c.display_name || "Unknown"}</td>
+                    <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`# ${c.tickets||0}`} color="#60a5fa"/></td>
+                    <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${parseFloat(c.revenue||0).toFixed(2)}`} color="#34d398"/></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
