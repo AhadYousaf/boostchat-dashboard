@@ -2190,14 +2190,7 @@ export default function App() {
     </div>
   );
 
-  if (!user) {
-    const isLoginPage = window.location.search.includes('login') || window.location.hash.includes('login');
-    if (!isLoginPage) {
-      window.location.replace('/landing.html');
-      return null;
-    }
-    return <LoginPage onLogin={(u) => { window.history.replaceState({}, '', '/'); setUser(u); }}/>;
-  }
+  if (!user) return <LoginPage onLogin={setUser}/>;
 
   const renderPage = () => {
     switch(page) {
