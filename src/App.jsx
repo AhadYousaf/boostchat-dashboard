@@ -2515,8 +2515,37 @@ const SettingsPage = ({ user }) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [page, setPage] = useState("hub");
+
+  const getInitialPage = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return 'node-detail';
+    const validPages = ['hub','bots','nodes','node-detail','customers','tickets','analytics','settings','reports','logs','notifications'];
+    return validPages.includes(hash) ? hash : 'hub';
+  };
+  const getInitialNodeId = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return hash.split(':')[1] || null;
+    return null;
+  };
+  const getInitialNodeTab = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return decodeURIComponent(hash.split(':').slice(2).join(':') || 'Node Overview');
+    return 'Node Overview';
+  };
+
+  const [page, setPageState] = useState(getInitialPage);
+  const [initialNodeId] = useState(getInitialNodeId);
+  const [initialNodeTab] = useState(getInitialNodeTab);
   const [selectedNode, setSelectedNode] = useState(null);
+
+  const setPage = (newPage, nodeId, tab) => {
+    setPageState(newPage);
+    if (newPage === 'node-detail' && nodeId) {
+      window.location.hash = 'node-detail:' + nodeId + ':' + encodeURIComponent(tab || 'Node Overview');
+    } else {
+      window.location.hash = newPage;
+    }
+  };
   const [nodes, setNodes] = useState([]);
   const [nodesLoading, setNodesLoading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -2543,6 +2572,13 @@ export default function App() {
 
   useEffect(() => { loadNodes(); }, [loadNodes]);
 
+  useEffect(() => {
+    if (initialNodeId && nodes.length > 0 && !selectedNode) {
+      const found = nodes.find(n => n.id === initialNodeId);
+      if (found) setSelectedNode(found);
+    }
+  }, [nodes, initialNodeId]);
+
   const handleLogout = () => { localStorage.removeItem("oc_token"); setUser(null); setNodes([]); setPage("hub"); };
 
   const fullHeight = ["tickets","analytics","logs"].includes(page);
@@ -2561,7 +2597,7 @@ export default function App() {
       case "hub": return <HubPage user={user} nodes={nodes} setPage={setPage} setSelectedNode={setSelectedNode}/>;
       case "bots": return <BotsPage nodes={nodes} refreshNodes={loadNodes}/>;
       case "nodes": return <NodesPage nodes={nodes} nodesLoading={nodesLoading} refreshNodes={loadNodes} setSelectedNode={setSelectedNode} setPage={setPage}/>;
-      case "node-detail": return selectedNode?<NodeDetailPage node={selectedNode} setPage={setPage} refreshNodes={loadNodes}/>:null;
+      case "node-detail": return selectedNode?<NodeDetailPage node={selectedNode} setPage={setPage} refreshNodes={loadNodes} initialTab={initialNodeTab}/>:null;
       case "customers": return <CustomersPage selectedNode={selectedNode}/>;
       case "tickets": return <TicketsPage selectedNode={selectedNode}/>;
       case "analytics": return <AnalyticsPage selectedNode={selectedNode} nodes={nodes}/>;
