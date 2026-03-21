@@ -146,9 +146,9 @@ const MiniChart = ({ data = [], color = "#6c4fd8", valueKey = "revenue" }) => {
 };
 
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
-const TopBar = ({ user, onLogout, showNotifs, setShowNotifs }) => (
+const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode }) => (
   <div style={S.topbar}>
-    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); }}>
       <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>⚡</div>
       <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>BoostChat</span>
     </div>
@@ -1303,8 +1303,8 @@ const RevoltSettingsTab = ({ node }) => {
 };
 
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
-const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
-  const [tab, setTab] = useState("overview");
+const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
+  const [tab, setTab] = useState(initialTab || "Node Overview");
   const [nodeData, setNodeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cutModal, setCutModal] = useState(false);
@@ -1394,7 +1394,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes }) => {
 
       <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:"1px solid #1e1e2e" }}>
         {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t} onClick={() => { setTab(t); window.location.hash = 'node-detail:' + node.id + ':' + encodeURIComponent(t); }}
             style={{ padding:"8px 16px", border:"none", background:"transparent",
               color:tab===t?(tabColors[t]||"#a78bfa"):"#6060a0", cursor:"pointer", fontSize:13, fontWeight:700,
               borderBottom:tab===t?`2px solid ${tabColors[t]||"#a78bfa"}`:"2px solid transparent", marginBottom:-1, display:"flex", alignItems:"center", gap:6 }}>
@@ -1777,11 +1777,7 @@ ${conversation}` }]
                     <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600 }}>{i+1}. {a.question}</div>
                     <div style={{ fontSize:12, color:"#c0c0e0", marginTop:2, paddingLeft:8 }}>
                       {a.media_url
-                        ? (
-                          <a href={a.media_url} target="_blank">
-                            <img src={a.media_url} alt="answer photo" style={{ maxWidth:"100%", maxHeight:180, borderRadius:8, display:"block", marginTop:4, cursor:"pointer", border:"1px solid #2a2a3e" }}/>
-                          </a>
-                        )
+                        ? <a href={a.media_url} target="_blank" style={{ color:"#60a5fa" }}>📷 View photo</a>
                         : a.customer_answer || "—"}
                     </div>
                   </div>
@@ -1818,11 +1814,7 @@ ${conversation}` }]
                             {m.sender_name || (isWorker ? "Worker" : "Customer")}
                           </div>
                           <div style={{ background:isWorker?"#2a1a4e":"#1a1a28", border:isWorker?"1px solid #3a2a5e":"1px solid #2a2a3e", borderRadius:isWorker?"12px 12px 2px 12px":"12px 12px 12px 2px", padding:"7px 10px", fontSize:12, color:"#e0e0f0", lineHeight:1.5, wordBreak:"break-word" }}>
-                            {m.content || (m.media_url ? (
-                              <a href={m.media_url} target="_blank">
-                                <img src={m.media_url} alt="media" style={{ maxWidth:"100%", maxHeight:240, borderRadius:8, display:"block", cursor:"pointer", border:"1px solid #2a2a3e" }}/>
-                              </a>
-                            ) : "—")}
+                            {m.content || (m.media_url ? <a href={m.media_url} target="_blank" style={{ color:"#60a5fa" }}>📷 View media</a> : "—")}
                           </div>
                           <div style={{ fontSize:9, color:"#4a4a70", marginTop:2, textAlign:isWorker?"right":"left" }}>
                             {formatTime(m.created_at)}
@@ -2490,8 +2482,36 @@ const SettingsPage = ({ user }) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [page, setPage] = useState("hub");
+  const getInitialPage = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return 'node-detail';
+    const validPages = ['hub','bots','nodes','node-detail','customers','tickets','analytics','settings','reports','logs','notifications'];
+    return validPages.includes(hash) ? hash : 'hub';
+  };
+  const getInitialNodeId = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return hash.split(':')[1] || null;
+    return null;
+  };
+  const getInitialNodeTab = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('node-detail:')) return decodeURIComponent(hash.split(':').slice(2).join(':') || 'Node Overview');
+    return 'Node Overview';
+  };
+
+  const [page, setPageState] = useState(getInitialPage);
+  const [initialNodeId] = useState(getInitialNodeId);
+  const [initialNodeTab] = useState(getInitialNodeTab);
   const [selectedNode, setSelectedNode] = useState(null);
+
+  const setPage = (newPage, nodeId, tab) => {
+    setPageState(newPage);
+    if (newPage === 'node-detail' && nodeId) {
+      window.location.hash = 'node-detail:' + nodeId + ':' + encodeURIComponent(tab || 'Node Overview');
+    } else {
+      window.location.hash = newPage;
+    }
+  };
   const [nodes, setNodes] = useState([]);
   const [nodesLoading, setNodesLoading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -2518,6 +2538,13 @@ export default function App() {
 
   useEffect(() => { loadNodes(); }, [loadNodes]);
 
+  useEffect(() => {
+    if (initialNodeId && nodes.length > 0 && !selectedNode) {
+      const found = nodes.find(n => n.id === initialNodeId);
+      if (found) setSelectedNode(found);
+    }
+  }, [nodes, initialNodeId]);
+
   const handleLogout = () => { localStorage.removeItem("oc_token"); setUser(null); setNodes([]); setPage("hub"); };
 
   const fullHeight = ["tickets","analytics","logs"].includes(page);
@@ -2536,7 +2563,7 @@ export default function App() {
       case "hub": return <HubPage user={user} nodes={nodes} setPage={setPage} setSelectedNode={setSelectedNode}/>;
       case "bots": return <BotsPage nodes={nodes} refreshNodes={loadNodes}/>;
       case "nodes": return <NodesPage nodes={nodes} nodesLoading={nodesLoading} refreshNodes={loadNodes} setSelectedNode={setSelectedNode} setPage={setPage}/>;
-      case "node-detail": return selectedNode?<NodeDetailPage node={selectedNode} setPage={setPage} refreshNodes={loadNodes}/>:null;
+      case "node-detail": return selectedNode?<NodeDetailPage node={selectedNode} setPage={setPage} refreshNodes={loadNodes} initialTab={initialNodeTab}/>:null;
       case "customers": return <CustomersPage selectedNode={selectedNode}/>;
       case "tickets": return <TicketsPage selectedNode={selectedNode}/>;
       case "analytics": return <AnalyticsPage selectedNode={selectedNode} nodes={nodes}/>;
@@ -2561,7 +2588,7 @@ export default function App() {
         button { font-family:inherit; }
         @keyframes spin { to { transform:rotate(360deg); } }
       `}</style>
-      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs}/>
+      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs} setPage={setPage} setSelectedNode={setSelectedNode}/>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <Sidebar page={page} setPage={setPage} nodes={nodes} nodesLoading={nodesLoading} selectedNode={selectedNode} setSelectedNode={setSelectedNode} collapsed={collapsed} setCollapsed={setCollapsed}/>
         <div style={{ flex:1, overflowY:fullHeight?"hidden":"auto", padding:fullHeight?0:"28px 32px", background:"#0d0d12", display:fullHeight?"flex":"block", flexDirection:fullHeight?"column":undefined }}>
