@@ -1707,6 +1707,20 @@ ${conversation}` }]
     finally { setSummarizing(false); }
   };
 
+  const [deleteMenu, setDeleteMenu] = useState(false);
+
+  const handleSoftDelete = async () => {
+    if (!window.confirm("Archive this ticket? It will be hidden but data is kept.")) return;
+    try { await api(`/tickets/${ticket.id}`, { method:"DELETE" }); onClose(); }
+    catch (err) { alert(err.message); }
+  };
+
+  const handleHardDelete = async () => {
+    if (!window.confirm("Permanently delete this ticket? Removes it from analytics too. Cannot be undone.")) return;
+    try { await api(`/tickets/${ticket.id}/hard`, { method:"DELETE" }); onClose(); }
+    catch (err) { alert(err.message); }
+  };
+
   const sc = { open:"#f59e0b", pending:"#f59e0b", in_progress:"#60a5fa", paid:"#34d398", closed:"#6060a0", cancelled:"#e05050" };
   const statusColor = sc[ticket.status] || "#6060a0";
   const hasPaid = parseFloat(ticket.amount_paid || 0) > 0;
@@ -1732,6 +1746,15 @@ ${conversation}` }]
         <span style={{ background:statusColor+"22", color:statusColor, border:`1px solid ${statusColor}44`, borderRadius:4, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
           {ticket.status}
         </span>
+        <div style={{ position:"relative" }}>
+          <button onClick={() => setDeleteMenu(v=>!v)} style={{ background:"#e0505022", border:"1px solid #e0505044", borderRadius:6, padding:"3px 8px", color:"#f87171", cursor:"pointer", fontSize:11, fontWeight:700 }}>🗑</button>
+          {deleteMenu && (
+            <div style={{ position:"absolute", right:0, top:32, background:"#16161f", border:"1px solid #2a2a3e", borderRadius:8, zIndex:50, boxShadow:"0 8px 24px #00000090", minWidth:180 }} onClick={e=>e.stopPropagation()}>
+              <button onClick={() => { setDeleteMenu(false); handleSoftDelete(); }} style={{ width:"100%", padding:"10px 14px", background:"transparent", border:"none", color:"#f59e0b", cursor:"pointer", fontSize:12, textAlign:"left", borderBottom:"1px solid #1e1e2e", fontWeight:600 }}>📦 Archive (keeps analytics)</button>
+              <button onClick={() => { setDeleteMenu(false); handleHardDelete(); }} style={{ width:"100%", padding:"10px 14px", background:"transparent", border:"none", color:"#f87171", cursor:"pointer", fontSize:12, textAlign:"left", fontWeight:600 }}>🗑 Permanently Delete</button>
+            </div>
+          )}
+        </div>
         <button onClick={onClose} style={{ background:"transparent", border:"none", color:"#6060a0", cursor:"pointer", fontSize:18, lineHeight:1, padding:"2px 4px" }}>✕</button>
       </div>
 
@@ -1777,7 +1800,7 @@ ${conversation}` }]
                     <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600 }}>{i+1}. {a.question}</div>
                     <div style={{ fontSize:12, color:"#c0c0e0", marginTop:2, paddingLeft:8 }}>
                       {a.media_url
-                        ? <a href={a.media_url} target="_blank" style={{ color:"#60a5fa" }}>📷 View photo</a>
+                        ? <a href={a.media_url} target="_blank"><img src={a.media_url} alt="answer photo" style={{ maxWidth:"100%", maxHeight:180, borderRadius:8, display:"block", marginTop:4, cursor:"pointer", border:"1px solid #2a2a3e" }}/></a>
                         : a.customer_answer || "—"}
                     </div>
                   </div>
@@ -1814,7 +1837,12 @@ ${conversation}` }]
                             {m.sender_name || (isWorker ? "Worker" : "Customer")}
                           </div>
                           <div style={{ background:isWorker?"#2a1a4e":"#1a1a28", border:isWorker?"1px solid #3a2a5e":"1px solid #2a2a3e", borderRadius:isWorker?"12px 12px 2px 12px":"12px 12px 12px 2px", padding:"7px 10px", fontSize:12, color:"#e0e0f0", lineHeight:1.5, wordBreak:"break-word" }}>
-                            {m.content || (m.media_url ? <a href={m.media_url} target="_blank" style={{ color:"#60a5fa" }}>📷 View media</a> : "—")}
+                            {(() => {
+                              const isMediaUrl = (s) => s && typeof s === 'string' && s.startsWith('http') && (s.includes('/media/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(s));
+                              const mediaUrl = isMediaUrl(m.content) ? m.content : m.media_url;
+                              if (mediaUrl) return <a href={mediaUrl} target="_blank"><img src={mediaUrl} alt="media" style={{ maxWidth:"100%", maxHeight:240, borderRadius:8, display:"block", cursor:"pointer", border:"1px solid #2a2a3e" }}/></a>;
+                              return m.content || "—";
+                            })()}
                           </div>
                           <div style={{ fontSize:9, color:"#4a4a70", marginTop:2, textAlign:isWorker?"right":"left" }}>
                             {formatTime(m.created_at)}
@@ -2031,7 +2059,7 @@ const TicketsPage = ({ selectedNode }) => {
 
       {/* Ticket detail panel */}
       {selectedTicket && (
-        <TicketDetailPanel ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
+        <TicketDetailPanel ticket={selectedTicket} onClose={() => { setSelectedTicket(null); load(); }}/>
       )}
     </div>
   );
