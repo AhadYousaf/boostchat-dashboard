@@ -2066,36 +2066,34 @@ const TicketsPage = ({ selectedNode }) => {
 };
 
 // ─── INTERACTIVE CHART ───────────────────────────────────────────────────────
-const InteractiveChart = ({ data = [], height = 280 }) => {
+const InteractiveChart = ({ data = [], height = 260 }) => {
   const [hover, setHover] = useState(null);
+
   if (!data.length) return (
-    <div style={{ height, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:"#3a3a5a", gap:12 }}>
-      <div style={{ fontSize:32, opacity:0.3 }}>📊</div>
-      <div style={{ fontSize:13, fontWeight:600 }}>No data for this period</div>
-      <div style={{ fontSize:12, color:"#2a2a4a" }}>Create some paid tickets to see your revenue chart</div>
+    <div style={{ height, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10 }}>
+      <div style={{ fontSize:28, opacity:0.2 }}>📊</div>
+      <div style={{ fontSize:12, color:"#3a3a6a", fontWeight:600 }}>No data for this period</div>
     </div>
   );
-
-  const padL = 58, padR = 20, padT = 20, padB = 32;
-  const W = 1000, H = height;
-  const chartW = W - padL - padR;
-  const chartH = H - padT - padB;
 
   const maxRev = Math.max(...data.map(d => parseFloat(d.revenue)||0), 1);
   const mag = Math.pow(10, Math.floor(Math.log10(maxRev)));
   const yMax = Math.ceil(maxRev / mag) * mag;
 
+  // Y ticks — 5 steps
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
-    val: yMax * t,
+    pct: t,
     label: yMax * t >= 1000 ? `$${((yMax*t)/1000).toFixed(1)}k` : `$${(yMax*t).toFixed(0)}`
   }));
 
-  const toX = (i) => padL + (i / Math.max(data.length - 1, 1)) * chartW;
-  const toY = (val) => padT + chartH - Math.max(0, Math.min(1, (parseFloat(val)||0) / yMax)) * chartH;
+  // SVG coordinate helpers — pure chart area, no text inside SVG
+  const W = 1000, H = height;
+  const toX = (i) => (i / Math.max(data.length - 1, 1)) * W;
+  const toY = (val) => H - Math.max(0, Math.min(1, (parseFloat(val)||0) / yMax)) * H;
 
   const smooth = (pts) => pts.map((p, i) => {
     if (i === 0) return `M${p.x},${p.y}`;
-    const prev = pts[i-1];
+    const prev = pts[i - 1];
     const cpx = (prev.x + p.x) / 2;
     return `C${cpx},${prev.y} ${cpx},${p.y} ${p.x},${p.y}`;
   }).join(' ');
@@ -2104,107 +2102,146 @@ const InteractiveChart = ({ data = [], height = 280 }) => {
   const proPts = data.map((d, i) => ({ x: toX(i), y: toY(d.profit || 0), d }));
   const revPath = smooth(revPts);
   const proPath = smooth(proPts);
-  const revFill = `${revPath} L${toX(data.length-1)},${padT+chartH} L${padL},${padT+chartH} Z`;
+  const revFill = `${revPath} L${W},${H} L0,${H} Z`;
 
-  const xStep = Math.max(1, Math.floor(data.length / 8));
-  const xLabels = data.map((d,i) => ({i,d})).filter(({i}) => i % xStep === 0 || i === data.length-1);
+  // X axis labels — max 7
+  const xStep = Math.max(1, Math.floor(data.length / 6));
+  const xLabels = data.map((d, i) => ({ i, d })).filter(({ i }) => i % xStep === 0 || i === data.length - 1);
+
+  const hoverPt = hover ? revPts.find(p => p.d.date === hover.date) : null;
+  const hoverPro = hover ? proPts.find(p => p.d.date === hover.date) : null;
 
   return (
-    <div style={{ position:"relative", userSelect:"none" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height, display:"block" }} preserveAspectRatio="none" onMouseLeave={() => setHover(null)}>
-        <defs>
-          <linearGradient id="revGrad2" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#818cf8" stopOpacity="0.25"/>
-            <stop offset="60%" stopColor="#60a5fa" stopOpacity="0.08"/>
-            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0"/>
-          </linearGradient>
-          <linearGradient id="proGrad2" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34d398" stopOpacity="0.15"/>
-            <stop offset="100%" stopColor="#34d398" stopOpacity="0"/>
-          </linearGradient>
-          <clipPath id="cc2"><rect x={padL} y={padT} width={chartW} height={chartH}/></clipPath>
-          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        </defs>
-
-        {/* Grid */}
-        {yTicks.map((t,i) => {
-          const y = padT + chartH - (t.val/yMax)*chartH;
-          return (
-            <g key={i}>
-              <line x1={padL} y1={y} x2={padL+chartW} y2={y} stroke={i===0?"#2a2a3e":"#1a1a28"} strokeWidth={i===0?1.5:1}/>
-              <text x={padL-10} y={y+4} textAnchor="end" fontSize="11" fill="#4a4a6a" fontFamily="DM Sans,sans-serif" fontWeight="600">{t.label}</text>
-            </g>
-          );
-        })}
-
-        {/* Fills */}
-        <path d={revFill} fill="url(#revGrad2)" clipPath="url(#cc2)"/>
-
-        {/* Lines */}
-        <path d={revPath} fill="none" stroke="url(#lineGrad)" strokeWidth="2.5" strokeLinecap="round" clipPath="url(#cc2)" filter="url(#glow)"/>
-        <path d={revPath} fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" clipPath="url(#cc2)"/>
-        <path d={proPath} fill="none" stroke="#34d398" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="6 4" clipPath="url(#cc2)"/>
-
-        {/* X labels */}
-        {xLabels.map(({i,d}) => (
-          <text key={i} x={toX(i)} y={H-8} textAnchor="middle" fontSize="10" fill="#4a4a6a" fontFamily="DM Sans,sans-serif">
-            {new Date(d.date).toLocaleDateString([],{month:'short',day:'numeric'})}
-          </text>
+    <div style={{ display:"flex", gap:0 }}>
+      {/* Y-axis labels — HTML, never distorted */}
+      <div style={{ width:44, flexShrink:0, height, position:"relative", marginRight:8 }}>
+        {yTicks.map((t, i) => (
+          <div key={i} style={{
+            position:"absolute",
+            right:0,
+            bottom:`${t.pct * 100}%`,
+            transform:"translateY(50%)",
+            fontSize:10,
+            color:"#4a4a6a",
+            fontWeight:600,
+            whiteSpace:"nowrap",
+            lineHeight:1
+          }}>{t.label}</div>
         ))}
+      </div>
 
-        {/* Hover zones */}
-        {revPts.map((p,i) => {
-          const x0 = i === 0 ? padL : (revPts[i-1].x + p.x)/2;
-          const x1 = i === revPts.length-1 ? padL+chartW : (p.x + (revPts[i+1]?.x||p.x))/2;
-          return (
-            <rect key={i} x={x0} y={padT} width={x1-x0} height={chartH} fill="transparent" style={{ cursor:"crosshair" }}
-              onMouseEnter={() => setHover({ ...p.d, px: p.x/W*100 })}/>
-          );
-        })}
-
-        {/* Hover indicator */}
-        {hover && (() => {
-          const pt = revPts.find(p => p.d.date === hover.date);
-          const pp = proPts.find(p => p.d.date === hover.date);
-          if (!pt) return null;
-          return (
-            <g>
-              <line x1={pt.x} y1={padT} x2={pt.x} y2={padT+chartH} stroke="#3a3a5e" strokeWidth="1" strokeDasharray="4 3"/>
-              <circle cx={pt.x} cy={pt.y} r="6" fill="#818cf8" stroke="#0d0d12" strokeWidth="2.5"/>
-              <circle cx={pt.x} cy={pt.y} r="3" fill="#fff"/>
-              {pp && <circle cx={pp.x} cy={pp.y} r="5" fill="#34d398" stroke="#0d0d12" strokeWidth="2"/>}
-            </g>
-          );
-        })()}
-      </svg>
-
-      {/* Tooltip */}
-      {hover && (
-        <div style={{
-          position:"absolute", top:12,
-          left:`${Math.min(Math.max(hover.px, 6), 72)}%`,
-          transform:"translateX(-50%)",
-          background:"rgba(15,15,25,0.96)", backdropFilter:"blur(12px)",
-          border:"1px solid #2a2a4e", borderRadius:12,
-          padding:"12px 16px", fontSize:12, pointerEvents:"none",
-          whiteSpace:"nowrap", zIndex:20,
-          boxShadow:"0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(129,140,248,0.1)"
-        }}>
-          <div style={{ fontSize:11, color:"#6060a0", fontWeight:600, marginBottom:10, textTransform:"uppercase", letterSpacing:0.8 }}>
-            {new Date(hover.date).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-            <div style={{ width:8, height:8, borderRadius:"50%", background:"#818cf8", flexShrink:0 }}/>
-            <span style={{ color:"#8080a0", flex:1 }}>Revenue</span>
-            <span style={{ color:"#a5b4fc", fontWeight:800, fontSize:13 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:8, height:8, borderRadius:"50%", background:"#34d398", flexShrink:0 }}/>
-            <span style={{ color:"#8080a0", flex:1 }}>Profit</span>
-            <span style={{ color:"#34d398", fontWeight:800, fontSize:13 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
-          </div>
+      {/* Chart area */}
+      <div style={{ flex:1, position:"relative" }}>
+        {/* Grid lines — HTML, perfectly sharp */}
+        <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
+          {yTicks.map((t, i) => (
+            <div key={i} style={{
+              position:"absolute",
+              left:0, right:0,
+              bottom:`${t.pct * 100}%`,
+              height:1,
+              background: t.pct === 0 ? "#2a2a3e" : "#1a1a2a"
+            }}/>
+          ))}
         </div>
-      )}
+
+        {/* SVG — only lines and fills, no text, preserveAspectRatio none is fine now */}
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width:"100%", height, display:"block", position:"relative", zIndex:1 }}
+          preserveAspectRatio="none"
+          onMouseLeave={() => setHover(null)}
+        >
+          <defs>
+            <linearGradient id="rg3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#818cf8" stopOpacity="0.2"/>
+              <stop offset="100%" stopColor="#818cf8" stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+
+          {/* Fill */}
+          <path d={revFill} fill="url(#rg3)"/>
+
+          {/* Revenue line */}
+          <path d={revPath} fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+
+          {/* Profit line */}
+          <path d={proPath} fill="none" stroke="#34d398" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="6 4"/>
+
+          {/* Hover zones */}
+          {revPts.map((p, i) => {
+            const x0 = i === 0 ? 0 : (revPts[i - 1].x + p.x) / 2;
+            const x1 = i === revPts.length - 1 ? W : (p.x + (revPts[i + 1]?.x || p.x)) / 2;
+            return (
+              <rect key={i} x={x0} y={0} width={x1 - x0} height={H}
+                fill="transparent" style={{ cursor:"crosshair" }}
+                onMouseEnter={() => setHover({ ...p.d, pct: p.x / W * 100 })}/>
+            );
+          })}
+
+          {/* Hover crosshair + dots */}
+          {hoverPt && (
+            <g>
+              <line x1={hoverPt.x} y1={0} x2={hoverPt.x} y2={H} stroke="#2a2a4e" strokeWidth="1" strokeDasharray="4 3"/>
+              <circle cx={hoverPt.x} cy={hoverPt.y} r="5" fill="#818cf8" stroke="#0d0d12" strokeWidth="2.5"/>
+              <circle cx={hoverPt.x} cy={hoverPt.y} r="2.5" fill="#fff"/>
+              {hoverPro && <circle cx={hoverPro.x} cy={hoverPro.y} r="4" fill="#34d398" stroke="#0d0d12" strokeWidth="2"/>}
+            </g>
+          )}
+        </svg>
+
+        {/* X-axis labels — HTML, never distorted */}
+        <div style={{ display:"flex", justifyContent:"space-between", paddingTop:6, position:"relative" }}>
+          {xLabels.map(({ i, d }) => (
+            <div key={i} style={{
+              fontSize:10,
+              color:"#4a4a6a",
+              fontWeight:500,
+              textAlign:"center",
+              whiteSpace:"nowrap",
+              position:"absolute",
+              left:`${toX(i) / W * 100}%`,
+              transform:"translateX(-50%)"
+            }}>
+              {new Date(d.date).toLocaleDateString([], { month:'short', day:'numeric' })}
+            </div>
+          ))}
+        </div>
+        <div style={{ height:20 }}/>{/* spacer for x labels */}
+
+        {/* Tooltip */}
+        {hover && (
+          <div style={{
+            position:"absolute",
+            top:8,
+            left:`${Math.min(Math.max(hover.pct, 8), 70)}%`,
+            transform:"translateX(-50%)",
+            background:"rgba(12,12,20,0.97)",
+            backdropFilter:"blur(16px)",
+            border:"1px solid #2a2a42",
+            borderRadius:10,
+            padding:"10px 14px",
+            pointerEvents:"none",
+            whiteSpace:"nowrap",
+            zIndex:30,
+            boxShadow:"0 12px 40px rgba(0,0,0,0.7)"
+          }}>
+            <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600, marginBottom:8, textTransform:"uppercase", letterSpacing:0.8 }}>
+              {new Date(hover.date).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' })}
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+              <div style={{ width:7, height:7, borderRadius:"50%", background:"#818cf8", flexShrink:0 }}/>
+              <span style={{ fontSize:11, color:"#7070a0" }}>Revenue</span>
+              <span style={{ fontSize:13, fontWeight:800, color:"#a5b4fc", marginLeft:"auto", paddingLeft:16 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ width:7, height:7, borderRadius:"50%", background:"#34d398", flexShrink:0 }}/>
+              <span style={{ fontSize:11, color:"#7070a0" }}>Profit</span>
+              <span style={{ fontSize:13, fontWeight:800, color:"#34d398", marginLeft:"auto", paddingLeft:16 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -2245,8 +2282,8 @@ const DateRangePicker = ({ startDate, endDate, onChange }) => {
         📅 {fmt(startDate)} — {fmt(endDate)} ▾
       </button>
       {open && (
-        <div style={{ position:"absolute", top:40, left:0, background:"#16161f", border:"1px solid #2a2a3e",
-          borderRadius:12, zIndex:100, boxShadow:"0 20px 60px #00000090", display:"flex", minWidth:620 }}
+        <div style={{ position:"absolute", top:40, right:0, background:"#16161f", border:"1px solid #2a2a3e",
+          borderRadius:12, zIndex:200, boxShadow:"0 20px 60px #00000090", display:"flex", minWidth:620 }}
           onClick={e=>e.stopPropagation()}>
           <div style={{ width:140, borderRight:"1px solid #1e1e2e", padding:"12px 8px" }}>
             {presets.map(p => (
