@@ -2726,11 +2726,49 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
 };
 
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
-const SettingsPage = ({ user }) => {
+const SettingsPage = ({ user, onUpdate }) => {
   const [editField, setEditField] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const [editValue2, setEditValue2] = useState(""); // for password confirm
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState("");
 
-  const Row = ({ label, value, desc, onManage, manageColor }) => (
+  const openEdit = (field, current = "") => {
+    setEditField(field);
+    setEditValue(current);
+    setEditValue2("");
+    setSaveError("");
+    setSaveSuccess("");
+  };
+
+  const handleSave = async () => {
+    setSaving(true); setSaveError(""); setSaveSuccess("");
+    try {
+      let body = {};
+      if (editField === "Username") {
+        if (!editValue.trim()) { setSaveError("Username cannot be empty."); setSaving(false); return; }
+        body = { username: editValue.trim() };
+      } else if (editField === "Email") {
+        if (!editValue.trim()) { setSaveError("Email cannot be empty."); setSaving(false); return; }
+        body = { email: editValue.trim() };
+      } else if (editField === "Password") {
+        if (!editValue) { setSaveError("Current password is required."); setSaving(false); return; }
+        if (!editValue2 || editValue2.length < 6) { setSaveError("New password must be at least 6 characters."); setSaving(false); return; }
+        body = { current_password: editValue, new_password: editValue2 };
+      }
+      const data = await api("/auth/profile", { method: "PUT", body });
+      if (data.user) onUpdate(data.user);
+      setSaveSuccess("Saved successfully!");
+      setTimeout(() => { setEditField(null); setSaveSuccess(""); }, 1200);
+    } catch (err) {
+      setSaveError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const Row = ({ label, value, desc, onManage, manageColor, editCurrent }) => (
     <div style={{ display:"flex", alignItems:"center", padding:"16px 20px", background:"#1a1a28", borderRadius:10, marginBottom:8, border:"1px solid #2a2a3e" }}>
       {desc && <div style={{ width:36, height:36, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, marginRight:14, flexShrink:0 }}>⚡</div>}
       <div style={{ flex:1 }}>
@@ -2740,9 +2778,11 @@ const SettingsPage = ({ user }) => {
       </div>
       {onManage
         ? <button style={{ ...S.btn(manageColor||"#f59e0b"), fontSize:12, padding:"6px 16px" }}>Manage</button>
-        : <button style={{ ...S.btnOutline, fontSize:12, padding:"6px 16px" }} onClick={() => { setEditField(label); setEditValue(""); }}>Edit</button>}
+        : <button style={{ ...S.btnOutline, fontSize:12, padding:"6px 16px" }} onClick={() => openEdit(label, editCurrent||"")}>Edit</button>}
     </div>
   );
+
+  const isPassword = editField === "Password";
 
   return (
     <div>
@@ -2770,8 +2810,8 @@ const SettingsPage = ({ user }) => {
           <h2 style={{ fontSize:18, fontWeight:800 }}>General</h2>
         </div>
         <p style={{ color:"#6060a0", fontSize:13, marginBottom:16 }}>View and update your general account information.</p>
-        <Row label="Username" value={user?.username}/>
-        <Row label="Email" value={user?.email||"Not set"}/>
+        <Row label="Username" value={user?.username} editCurrent={user?.username}/>
+        <Row label="Email" value={user?.email||"Not set"} editCurrent={user?.email||""}/>
         <Row label="Avatar" desc="Upload a custom avatar."/>
         <Row label="Banner" desc="Upload a custom banner for the sidebar."/>
       </div>
@@ -2784,14 +2824,41 @@ const SettingsPage = ({ user }) => {
         <Row label="Password" value="••••••••••••••••••••"/>
         <Row label="Two-factor authentication" desc="Adds an extra layer of security to your account." onManage={() => {}} manageColor="#f59e0b"/>
       </div>
+
       {editField && (
         <div style={{ position:"fixed", inset:0, background:"#00000088", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200 }} onClick={() => setEditField(null)}>
-          <div style={{ ...S.card, padding:"28px", width:420 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ ...S.card, padding:"28px", width:440 }} onClick={e=>e.stopPropagation()}>
             <h3 style={{ margin:"0 0 4px", fontSize:16, fontWeight:700 }}>Edit {editField}</h3>
-            <input style={{ ...S.input, marginBottom:16, marginTop:12 }} placeholder={`New ${editField.toLowerCase()}...`} value={editValue} onChange={e=>setEditValue(e.target.value)}/>
+            <p style={{ margin:"0 0 18px", color:"#6060a0", fontSize:13 }}>
+              {isPassword ? "Enter your current password, then your new password." : `Update your ${editField.toLowerCase()}.`}
+            </p>
+
+            {isPassword ? (
+              <>
+                <label style={{ display:"block", fontSize:11, color:"#6060a0", fontWeight:700, marginBottom:5, textTransform:"uppercase", letterSpacing:0.8 }}>Current password</label>
+                <input type="password" style={{ ...S.input, marginBottom:12 }} placeholder="Your current password..."
+                  value={editValue} onChange={e => setEditValue(e.target.value)}/>
+                <label style={{ display:"block", fontSize:11, color:"#6060a0", fontWeight:700, marginBottom:5, textTransform:"uppercase", letterSpacing:0.8 }}>New password</label>
+                <input type="password" style={{ ...S.input, marginBottom:16 }} placeholder="New password (min 6 chars)..."
+                  value={editValue2} onChange={e => setEditValue2(e.target.value)}/>
+              </>
+            ) : (
+              <>
+                <label style={{ display:"block", fontSize:11, color:"#6060a0", fontWeight:700, marginBottom:5, textTransform:"uppercase", letterSpacing:0.8 }}>New {editField.toLowerCase()}</label>
+                <input style={{ ...S.input, marginBottom:16 }} placeholder={`Enter new ${editField.toLowerCase()}...`}
+                  value={editValue} onChange={e => setEditValue(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSave()}/>
+              </>
+            )}
+
+            {saveError && <div style={{ background:"#e0505018", border:"1px solid #e0505044", borderRadius:8, padding:"8px 12px", color:"#f87171", fontSize:12, marginBottom:12 }}>⚠ {saveError}</div>}
+            {saveSuccess && <div style={{ background:"#34d39818", border:"1px solid #34d39844", borderRadius:8, padding:"8px 12px", color:"#34d398", fontSize:12, marginBottom:12 }}>✓ {saveSuccess}</div>}
+
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
               <button style={S.btnOutline} onClick={() => setEditField(null)}>Cancel</button>
-              <button style={S.btn()} onClick={() => setEditField(null)}>Save changes</button>
+              <button style={{ ...S.btn(), opacity: saving ? 0.7 : 1 }} onClick={handleSave} disabled={saving}>
+                {saving ? <><Spinner size={13}/> Saving...</> : "Save changes"}
+              </button>
             </div>
           </div>
         </div>
@@ -2889,7 +2956,7 @@ export default function App() {
       case "customers": return <CustomersPage selectedNode={selectedNode}/>;
       case "tickets": return <TicketsPage selectedNode={selectedNode}/>;
       case "analytics": return <AnalyticsPage selectedNode={selectedNode} nodes={nodes}/>;
-      case "settings": return <SettingsPage user={user}/>;
+      case "settings": return <SettingsPage user={user} onUpdate={(u) => setUser(u)}/>;
       case "reports": return <div style={{ padding:"32px" }}><h1 style={{ fontSize:24, fontWeight:800, marginBottom:16 }}>Reports</h1><div style={{ ...S.card, padding:"48px", textAlign:"center", color:"#4040a0" }}>Report generation coming soon.</div></div>;
       case "logs": return <div style={{ padding:"32px" }}><h1 style={{ fontSize:24, fontWeight:800, marginBottom:16 }}>Logs</h1><div style={{ ...S.card, padding:"48px", textAlign:"center", color:"#4040a0" }}>System logs coming soon.</div></div>;
       default: return <HubPage user={user} nodes={nodes} setPage={setPage} setSelectedNode={setSelectedNode}/>;
