@@ -2066,129 +2066,113 @@ const TicketsPage = ({ selectedNode }) => {
 };
 
 // ─── INTERACTIVE CHART ───────────────────────────────────────────────────────
-const InteractiveChart = ({ data = [], height = 240 }) => {
+const InteractiveChart = ({ data = [], height = 280 }) => {
   const [hover, setHover] = useState(null);
   if (!data.length) return (
-    <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:12 }}>
-      No data for this period
+    <div style={{ height, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:"#3a3a5a", gap:12 }}>
+      <div style={{ fontSize:32, opacity:0.3 }}>📊</div>
+      <div style={{ fontSize:13, fontWeight:600 }}>No data for this period</div>
+      <div style={{ fontSize:12, color:"#2a2a4a" }}>Create some paid tickets to see your revenue chart</div>
     </div>
   );
 
-  const padL = 56, padR = 16, padT = 16, padB = 28;
-  const maxRev = Math.max(...data.map(d => parseFloat(d.revenue)||0), 1);
+  const padL = 58, padR = 20, padT = 20, padB = 32;
+  const W = 1000, H = height;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
 
-  // Nice round Y axis max
-  const magnitude = Math.pow(10, Math.floor(Math.log10(maxRev)));
-  const yMax = Math.ceil(maxRev / magnitude) * magnitude;
+  const maxRev = Math.max(...data.map(d => parseFloat(d.revenue)||0), 1);
+  const mag = Math.pow(10, Math.floor(Math.log10(maxRev)));
+  const yMax = Math.ceil(maxRev / mag) * mag;
+
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
     val: yMax * t,
     label: yMax * t >= 1000 ? `$${((yMax*t)/1000).toFixed(1)}k` : `$${(yMax*t).toFixed(0)}`
   }));
 
-  // Smooth bezier curve helper
-  const smooth = (pts) => {
-    if (pts.length < 2) return pts.map(p=>`L${p.x},${p.y}`).join(' ');
-    return pts.map((p, i) => {
-      if (i === 0) return `M${p.x},${p.y}`;
-      const prev = pts[i-1];
-      const cpx = (prev.x + p.x) / 2;
-      return `C${cpx},${prev.y} ${cpx},${p.y} ${p.x},${p.y}`;
-    }).join(' ');
-  };
-
-  // We use a percentage-based viewBox so the SVG scales perfectly
-  const W = 1000, H = height;
-  const chartW = W - padL - padR;
-  const chartH = H - padT - padB;
-
   const toX = (i) => padL + (i / Math.max(data.length - 1, 1)) * chartW;
-  const toY = (val) => padT + chartH - (parseFloat(val)||0) / yMax * chartH;
+  const toY = (val) => padT + chartH - Math.max(0, Math.min(1, (parseFloat(val)||0) / yMax)) * chartH;
+
+  const smooth = (pts) => pts.map((p, i) => {
+    if (i === 0) return `M${p.x},${p.y}`;
+    const prev = pts[i-1];
+    const cpx = (prev.x + p.x) / 2;
+    return `C${cpx},${prev.y} ${cpx},${p.y} ${p.x},${p.y}`;
+  }).join(' ');
 
   const revPts = data.map((d, i) => ({ x: toX(i), y: toY(d.revenue), d }));
-  const proPts = data.map((d, i) => ({ x: toX(i), y: toY(d.profit), d }));
-
+  const proPts = data.map((d, i) => ({ x: toX(i), y: toY(d.profit || 0), d }));
   const revPath = smooth(revPts);
   const proPath = smooth(proPts);
-  const revFillPath = `${revPath} L${toX(data.length-1)},${padT+chartH} L${padL},${padT+chartH} Z`;
+  const revFill = `${revPath} L${toX(data.length-1)},${padT+chartH} L${padL},${padT+chartH} Z`;
 
-  // X axis labels — show up to 8 evenly spaced
-  const xStep = Math.max(1, Math.floor(data.length / 7));
-  const xLabels = data.map((d, i) => ({ i, d })).filter(({i}) => i % xStep === 0 || i === data.length - 1);
+  const xStep = Math.max(1, Math.floor(data.length / 8));
+  const xLabels = data.map((d,i) => ({i,d})).filter(({i}) => i % xStep === 0 || i === data.length-1);
 
   return (
     <div style={{ position:"relative", userSelect:"none" }}>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        style={{ width:"100%", height, display:"block" }}
-        preserveAspectRatio="none"
-        onMouseLeave={() => setHover(null)}
-      >
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height, display:"block" }} preserveAspectRatio="none" onMouseLeave={() => setHover(null)}>
         <defs>
-          <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.18"/>
+          <linearGradient id="revGrad2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#818cf8" stopOpacity="0.25"/>
+            <stop offset="60%" stopColor="#60a5fa" stopOpacity="0.08"/>
             <stop offset="100%" stopColor="#60a5fa" stopOpacity="0"/>
           </linearGradient>
-          <clipPath id="chartClip">
-            <rect x={padL} y={padT} width={chartW} height={chartH}/>
-          </clipPath>
+          <linearGradient id="proGrad2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#34d398" stopOpacity="0.15"/>
+            <stop offset="100%" stopColor="#34d398" stopOpacity="0"/>
+          </linearGradient>
+          <clipPath id="cc2"><rect x={padL} y={padT} width={chartW} height={chartH}/></clipPath>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
 
-        {/* Y grid lines + labels */}
-        {yTicks.map((t, i) => {
-          const y = padT + chartH - (t.val / yMax) * chartH;
+        {/* Grid */}
+        {yTicks.map((t,i) => {
+          const y = padT + chartH - (t.val/yMax)*chartH;
           return (
             <g key={i}>
-              <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke="#1e1e2e" strokeWidth="1"/>
-              <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#4a4a6a" fontFamily="DM Sans, sans-serif">{t.label}</text>
+              <line x1={padL} y1={y} x2={padL+chartW} y2={y} stroke={i===0?"#2a2a3e":"#1a1a28"} strokeWidth={i===0?1.5:1}/>
+              <text x={padL-10} y={y+4} textAnchor="end" fontSize="11" fill="#4a4a6a" fontFamily="DM Sans,sans-serif" fontWeight="600">{t.label}</text>
             </g>
           );
         })}
 
-        {/* X axis line */}
-        <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#2a2a3e" strokeWidth="1"/>
+        {/* Fills */}
+        <path d={revFill} fill="url(#revGrad2)" clipPath="url(#cc2)"/>
 
-        {/* Revenue fill */}
-        <path d={revFillPath} fill="url(#revGrad)" clipPath="url(#chartClip)"/>
+        {/* Lines */}
+        <path d={revPath} fill="none" stroke="url(#lineGrad)" strokeWidth="2.5" strokeLinecap="round" clipPath="url(#cc2)" filter="url(#glow)"/>
+        <path d={revPath} fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" clipPath="url(#cc2)"/>
+        <path d={proPath} fill="none" stroke="#34d398" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="6 4" clipPath="url(#cc2)"/>
 
-        {/* Revenue line */}
-        <path d={revPath} fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" clipPath="url(#chartClip)"/>
-
-        {/* Profit line */}
-        <path d={proPath} fill="none" stroke="#34d398" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="8 4" clipPath="url(#chartClip)"/>
-
-        {/* X axis labels */}
-        {xLabels.map(({i, d}) => (
-          <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="#4a4a6a" fontFamily="DM Sans, sans-serif">
-            {new Date(d.date).toLocaleDateString([], {month:'short', day:'numeric'})}
+        {/* X labels */}
+        {xLabels.map(({i,d}) => (
+          <text key={i} x={toX(i)} y={H-8} textAnchor="middle" fontSize="10" fill="#4a4a6a" fontFamily="DM Sans,sans-serif">
+            {new Date(d.date).toLocaleDateString([],{month:'short',day:'numeric'})}
           </text>
         ))}
 
-        {/* Hover areas */}
-        {revPts.map((p, i) => (
-          <rect key={i}
-            x={i === 0 ? padL : (revPts[i-1].x + p.x)/2}
-            y={padT}
-            width={i === 0
-              ? (revPts[1] ? (revPts[1].x + p.x)/2 - padL : chartW)
-              : (i === revPts.length-1 ? p.x + chartW/data.length - (revPts[i-1].x + p.x)/2 : (p.x + (revPts[i+1]?.x||p.x))/2 - (revPts[i-1].x + p.x)/2)
-            }
-            height={chartH}
-            fill="transparent"
-            style={{ cursor:"crosshair" }}
-            onMouseEnter={() => setHover({ ...p.d, px: p.x / W * 100, py: p.y })}
-          />
-        ))}
+        {/* Hover zones */}
+        {revPts.map((p,i) => {
+          const x0 = i === 0 ? padL : (revPts[i-1].x + p.x)/2;
+          const x1 = i === revPts.length-1 ? padL+chartW : (p.x + (revPts[i+1]?.x||p.x))/2;
+          return (
+            <rect key={i} x={x0} y={padT} width={x1-x0} height={chartH} fill="transparent" style={{ cursor:"crosshair" }}
+              onMouseEnter={() => setHover({ ...p.d, px: p.x/W*100 })}/>
+          );
+        })}
 
-        {/* Hover dot */}
+        {/* Hover indicator */}
         {hover && (() => {
           const pt = revPts.find(p => p.d.date === hover.date);
           const pp = proPts.find(p => p.d.date === hover.date);
           if (!pt) return null;
           return (
             <g>
-              <line x1={pt.x} y1={padT} x2={pt.x} y2={padT+chartH} stroke="#2a2a3e" strokeWidth="1" strokeDasharray="4 3"/>
-              <circle cx={pt.x} cy={pt.y} r="5" fill="#60a5fa" stroke="#0d0d12" strokeWidth="2"/>
-              {pp && <circle cx={pp.x} cy={pp.y} r="4" fill="#34d398" stroke="#0d0d12" strokeWidth="2"/>}
+              <line x1={pt.x} y1={padT} x2={pt.x} y2={padT+chartH} stroke="#3a3a5e" strokeWidth="1" strokeDasharray="4 3"/>
+              <circle cx={pt.x} cy={pt.y} r="6" fill="#818cf8" stroke="#0d0d12" strokeWidth="2.5"/>
+              <circle cx={pt.x} cy={pt.y} r="3" fill="#fff"/>
+              {pp && <circle cx={pp.x} cy={pp.y} r="5" fill="#34d398" stroke="#0d0d12" strokeWidth="2"/>}
             </g>
           );
         })()}
@@ -2197,40 +2181,30 @@ const InteractiveChart = ({ data = [], height = 240 }) => {
       {/* Tooltip */}
       {hover && (
         <div style={{
-          position:"absolute", top:16,
-          left:`${Math.min(Math.max(hover.px, 8), 68)}%`,
+          position:"absolute", top:12,
+          left:`${Math.min(Math.max(hover.px, 6), 72)}%`,
           transform:"translateX(-50%)",
-          background:"#12121f", border:"1px solid #2a2a3e", borderRadius:10,
-          padding:"10px 14px", fontSize:12, pointerEvents:"none",
-          whiteSpace:"nowrap", zIndex:20, boxShadow:"0 8px 32px #00000099"
+          background:"rgba(15,15,25,0.96)", backdropFilter:"blur(12px)",
+          border:"1px solid #2a2a4e", borderRadius:12,
+          padding:"12px 16px", fontSize:12, pointerEvents:"none",
+          whiteSpace:"nowrap", zIndex:20,
+          boxShadow:"0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(129,140,248,0.1)"
         }}>
-          <div style={{ fontWeight:700, color:"#e2e2f0", marginBottom:8, fontSize:11, color:"#8080a0" }}>
+          <div style={{ fontSize:11, color:"#6060a0", fontWeight:600, marginBottom:10, textTransform:"uppercase", letterSpacing:0.8 }}>
             {new Date(hover.date).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:"#60a5fa", display:"inline-block", flexShrink:0 }}/>
-            <span style={{ color:"#8080a0" }}>Revenue</span>
-            <span style={{ color:"#60a5fa", fontWeight:700, marginLeft:"auto", paddingLeft:16 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+            <div style={{ width:8, height:8, borderRadius:"50%", background:"#818cf8", flexShrink:0 }}/>
+            <span style={{ color:"#8080a0", flex:1 }}>Revenue</span>
+            <span style={{ color:"#a5b4fc", fontWeight:800, fontSize:13 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:"#34d398", display:"inline-block", flexShrink:0 }}/>
-            <span style={{ color:"#8080a0" }}>Profit</span>
-            <span style={{ color:"#34d398", fontWeight:700, marginLeft:"auto", paddingLeft:16 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:8, height:8, borderRadius:"50%", background:"#34d398", flexShrink:0 }}/>
+            <span style={{ color:"#8080a0", flex:1 }}>Profit</span>
+            <span style={{ color:"#34d398", fontWeight:800, fontSize:13 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
           </div>
         </div>
       )}
-
-      {/* Legend */}
-      <div style={{ display:"flex", gap:16, justifyContent:"flex-end", marginTop:8, paddingRight:4 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6060a0" }}>
-          <span style={{ width:16, height:2, background:"#60a5fa", display:"inline-block", borderRadius:2 }}/>
-          Revenue
-        </div>
-        <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6060a0" }}>
-          <span style={{ width:16, height:2, background:"#34d398", display:"inline-block", borderRadius:2, borderTop:"2px dashed #34d398", background:"none" }}/>
-          Profit
-        </div>
-      </div>
     </div>
   );
 };
@@ -2343,10 +2317,10 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   const [endDate, setEndDate] = useState(defaultEnd);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [chartTab, setChartTab] = useState("revenue");
   const [svcPage, setSvcPage] = useState(1);
   const [ctrPage, setCtrPage] = useState(1);
-  const perPage = 10;
+  const [activeTab, setActiveTab] = useState("overview");
+  const perPage = 8;
   const targetNode = selectedNode || nodes[0];
 
   const load = useCallback(async () => {
@@ -2363,7 +2337,12 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  if (!targetNode) return <div style={{ padding:"48px", textAlign:"center", color:"#4040a0" }}><div style={{ fontSize:14, fontWeight:700 }}>No nodes yet</div></div>;
+  if (!targetNode) return (
+    <div style={{ padding:"80px", textAlign:"center", color:"#4040a0" }}>
+      <div style={{ fontSize:48, marginBottom:16, opacity:0.3 }}>⬡</div>
+      <div style={{ fontSize:16, fontWeight:700 }}>No nodes yet</div>
+    </div>
+  );
 
   const ov = data?.overview || {};
   const services = data?.services || [];
@@ -2373,172 +2352,336 @@ const AnalyticsPage = ({ selectedNode, nodes }) => {
   const totalRevenue = parseFloat(ov.total_revenue||0);
   const totalPaidTickets = parseInt(ov.paid_tickets||0);
   const totalProfits = workers.reduce((sum,w) => sum + (parseFloat(w.revenue||0)*(parseFloat(w.cut_percentage||0)/100)), 0);
+  const avgRevPerCustomer = ov.unique_customers ? (totalRevenue/parseInt(ov.unique_customers)) : 0;
+  const retentionRate = ov.paid_tickets && ov.total_tickets ? ((parseInt(ov.paid_tickets)/parseInt(ov.total_tickets))*100) : 0;
   const dailyWithProfit = daily.map(d => ({ ...d, profit: parseFloat(d.revenue||0) * (totalProfits/(totalRevenue||1)) }));
   const svcPages = Math.ceil(services.length/perPage);
   const ctrPages = Math.ceil(workers.length/perPage);
-  const svcSlice = services.slice((svcPage-1)*perPage, svcPage*perPage);
-  const ctrSlice = workers.slice((ctrPage-1)*perPage, ctrPage*perPage);
 
-  const Badge = ({ value, color }) => (
-    <span style={{ background:color+"22", color, border:`1px solid ${color}44`, borderRadius:6, padding:"3px 10px", fontSize:11, fontWeight:700, whiteSpace:"nowrap" }}>{value}</span>
+  const Chip = ({ value, color }) => (
+    <span style={{ background:color+"1a", color, border:`1px solid ${color}33`, borderRadius:6, padding:"3px 9px", fontSize:11, fontWeight:700, whiteSpace:"nowrap", letterSpacing:0.3 }}>{value}</span>
   );
 
-  const Pagination = ({ page, pages, setPage }) => {
+  const Pg = ({ page, pages, setPage }) => {
     if (pages <= 1) return null;
     return (
-      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-        <button onClick={() => setPage(1)} disabled={page===1} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>«</button>
-        <button onClick={() => setPage(p=>Math.max(1,p-1))} disabled={page===1} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>‹</button>
-        {Array.from({length:pages},(_,i)=>i+1).map(n => (
-          <button key={n} onClick={() => setPage(n)}
-            style={{ background:page===n?"#6c4fd833":"transparent", border:`1px solid ${page===n?"#6c4fd8":"#2a2a3e"}`,
-              borderRadius:4, padding:"2px 8px", color:page===n?"#a78bfa":"#9090b8", cursor:"pointer", fontSize:12, fontWeight:page===n?700:400, minWidth:28 }}>{n}</button>
-        ))}
-        <button onClick={() => setPage(p=>Math.min(pages,p+1))} disabled={page>=pages} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=pages?0.4:1 }}>›</button>
-        <button onClick={() => setPage(pages)} disabled={page>=pages} style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 7px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=pages?0.4:1 }}>»</button>
+      <div style={{ display:"flex", gap:3 }}>
+        <button onClick={() => setPage(p=>Math.max(1,p-1))} disabled={page===1} style={{ background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:5, padding:"2px 8px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page===1?0.4:1 }}>‹</button>
+        <span style={{ padding:"2px 10px", fontSize:11, color:"#6060a0", background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:5 }}>{page}/{pages}</span>
+        <button onClick={() => setPage(p=>Math.min(pages,p+1))} disabled={page>=pages} style={{ background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:5, padding:"2px 8px", color:"#9090b8", cursor:"pointer", fontSize:12, opacity:page>=pages?0.4:1 }}>›</button>
       </div>
     );
   };
 
+  // Stat card with subtle inner glow
+  const StatCard = ({ label, value, sub, color, icon, accent }) => (
+    <div style={{ flex:1, minWidth:0, background:`linear-gradient(135deg, ${color}0d 0%, #16161f 60%)`, border:`1px solid ${color}22`, borderRadius:16, padding:"22px 24px", position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"absolute", inset:0, background:`radial-gradient(ellipse at top right, ${color}18, transparent 65%)`, pointerEvents:"none" }}/>
+      <div style={{ position:"absolute", right:20, top:18, fontSize:36, opacity:0.15 }}>{icon}</div>
+      <div style={{ fontSize:10, color:color+"99", fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", marginBottom:12 }}>{label}</div>
+      <div style={{ fontSize:32, fontWeight:900, color, lineHeight:1, marginBottom:6, letterSpacing:"-0.5px" }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:"#5050a0", marginTop:4 }}>{sub}</div>}
+    </div>
+  );
+
+  const tabs = [
+    { id:"overview", label:"Overview" },
+    { id:"services", label:"Services" },
+    { id:"contractors", label:"Contractors" },
+    { id:"customers", label:"Top Customers" },
+  ];
+
   return (
-    <div style={{ height:"100%", overflow:"auto" }}>
-      <div style={{ padding:"10px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, background:"#0d0d12", zIndex:10, flexWrap:"wrap" }}>
-        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s,e) => { setStartDate(s); setEndDate(e); setSvcPage(1); setCtrPage(1); }}/>
-        <span style={{ fontSize:12, color:"#5a5a80" }}>compared to previous period</span>
-        <div style={{ marginLeft:"auto" }}><span style={{ fontSize:11, color:"#5a5a80" }}>Showing results from {nodes.length} bot{nodes.length!==1?"s":""}</span></div>
+    <div style={{ height:"100%", overflow:"auto", background:"#0d0d12" }}>
+      <style>{`
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+        .ana-row:hover { background:#13131f !important; }
+        .ana-row:hover td { color:#e2e2f0 !important; }
+      `}</style>
+
+      {/* Sticky header */}
+      <div style={{ padding:"14px 24px", borderBottom:"1px solid #1a1a2a", display:"flex", alignItems:"center", gap:14, position:"sticky", top:0, background:"rgba(13,13,18,0.97)", backdropFilter:"blur(12px)", zIndex:10, flexWrap:"wrap" }}>
+        <div>
+          <div style={{ fontSize:18, fontWeight:800, color:"#e2e2f0", letterSpacing:"-0.3px" }}>Analytics</div>
+          <div style={{ fontSize:11, color:"#4a4a70", marginTop:1 }}>{targetNode.name} · {nodes.length} node{nodes.length!==1?"s":""}</div>
+        </div>
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
+          <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s,e) => { setStartDate(s); setEndDate(e); setSvcPage(1); setCtrPage(1); }}/>
+          <button onClick={load} style={{ background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"6px 12px", color:"#8080b0", cursor:"pointer", fontSize:13 }}>↻</button>
+        </div>
       </div>
+
       {loading ? (
-        <div style={{ padding:"48px", display:"flex", alignItems:"center", gap:12, color:"#6060a0" }}><Spinner/> Loading analytics...</div>
+        <div style={{ padding:"80px", display:"flex", flexDirection:"column", alignItems:"center", gap:16, color:"#6060a0" }}>
+          <Spinner size={32}/>
+          <div style={{ fontSize:13 }}>Loading analytics...</div>
+        </div>
       ) : (
-        <div style={{ padding:"20px 22px" }}>
-          <div style={{ fontSize:11, color:"#5a5a80", fontWeight:600, marginBottom:4 }}>Analytics</div>
-          <div style={{ fontSize:12, color:"#4a4a70", marginBottom:16 }}>View your analytics and statistics for your bots and webapps.</div>
-          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
-            {[
-              { label:"PAID TICKETS", value:`# ${totalPaidTickets.toLocaleString()}`, color:"#60a5fa" },
-              { label:"REVENUE", value:`$ ${totalRevenue.toFixed(2)}`, color:"#34d398" },
-              { label:"PROFITS", value:`$ ${totalProfits.toFixed(2)}`, color:"#f59e0b" },
-            ].map((s,i) => (
-              <div key={i} style={{ flex:1, background:s.color+"22", border:`1px solid ${s.color}44`, borderRadius:10, padding:"18px 22px", position:"relative", overflow:"hidden", minWidth:0 }}>
-                <div style={{ position:"absolute", right:16, top:12, fontSize:48, opacity:0.1, fontWeight:900, color:s.color }}>{i===0?"#":"$"}</div>
-                <div style={{ fontSize:9, color:s.color+"cc", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>{s.label}</div>
-                <div style={{ fontSize:34, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
+        <div style={{ padding:"24px", animation:"fadeIn 0.3s ease" }}>
+
+          {/* Hero stats */}
+          <div style={{ display:"flex", gap:14, marginBottom:24 }}>
+            <StatCard label="Total Revenue" value={`$${totalRevenue.toFixed(2)}`} sub={`${totalPaidTickets} paid tickets`} color="#818cf8" icon="💰"/>
+            <StatCard label="Net Profits" value={`$${totalProfits.toFixed(2)}`} sub={workers.length > 0 ? `${workers.length} contractor${workers.length!==1?"s":""}` : "No contractors yet"} color="#34d398" icon="📈"/>
+            <StatCard label="Avg / Customer" value={`$${avgRevPerCustomer.toFixed(0)}`} sub={`${ov.unique_customers||0} unique customers`} color="#f59e0b" icon="👥"/>
+            <StatCard label="Retention Rate" value={`${retentionRate.toFixed(0)}%`} sub={`${ov.returning_customers||0} returning`} color="#e879f9" icon="🔄"/>
+          </div>
+
+          {/* Chart card */}
+          <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:16, marginBottom:24, overflow:"hidden" }}>
+            {/* Chart header */}
+            <div style={{ padding:"16px 22px", borderBottom:"1px solid #1a1a28", display:"flex", alignItems:"center", gap:16 }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:700, color:"#e2e2f0" }}>Revenue & Profit</div>
+                <div style={{ fontSize:11, color:"#4a4a70", marginTop:2 }}>Daily breakdown for selected period</div>
               </div>
+              <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:20 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:24, height:3, borderRadius:2, background:"linear-gradient(90deg,#818cf8,#60a5fa)" }}/>
+                  <span style={{ fontSize:11, color:"#6060a0" }}>Revenue</span>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:24, height:2, borderRadius:2, borderTop:"2px dashed #34d398" }}/>
+                  <span style={{ fontSize:11, color:"#6060a0" }}>Profit</span>
+                </div>
+                <div style={{ background:"#818cf811", border:"1px solid #818cf822", borderRadius:8, padding:"4px 12px" }}>
+                  <span style={{ fontSize:13, fontWeight:800, color:"#a5b4fc" }}>${totalRevenue.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ padding:"16px 18px 8px" }}>
+              <InteractiveChart data={dailyWithProfit} height={260}/>
+            </div>
+          </div>
+
+          {/* Tab nav */}
+          <div style={{ display:"flex", gap:2, marginBottom:20, background:"#13131a", border:"1px solid #1e1e2e", borderRadius:12, padding:4, width:"fit-content" }}>
+            {tabs.map(t => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                style={{ padding:"7px 18px", borderRadius:9, border:"none", cursor:"pointer", fontSize:12, fontWeight:600, transition:"all 0.15s",
+                  background:activeTab===t.id?"#6c4fd8":"transparent",
+                  color:activeTab===t.id?"#fff":"#6060a0" }}>
+                {t.label}
+              </button>
             ))}
           </div>
-          <div style={{ ...S.card, marginBottom:20 }}>
-            <div style={{ padding:"10px 18px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:2 }}>
-              {[["revenue","📈 Revenue/Profits"],["tickets","🎫 Tickets"],["platform","🌐 Platform"]].map(([id,label]) => (
-                <button key={id} onClick={() => setChartTab(id)}
-                  style={{ background:"transparent", border:"none", padding:"4px 14px", fontSize:12, fontWeight:chartTab===id?700:400, color:chartTab===id?"#a78bfa":"#6060a0", cursor:"pointer", borderBottom:chartTab===id?"2px solid #a78bfa":"2px solid transparent", marginBottom:-1 }}>
-                  {label}
-                </button>
-              ))}
-              <div style={{ marginLeft:"auto", fontSize:14, fontWeight:800, color:"#34d398" }}>${totalRevenue.toFixed(2)}</div>
-            </div>
-            <div style={{ padding:"8px 18px 12px" }}>
-              <div style={{ fontSize:10, color:"#5a5a80", fontWeight:600, padding:"6px 0 4px" }}>Revenue/Profits</div>
-              <InteractiveChart data={dailyWithProfit} height={220}/>
-            </div>
-          </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
-            <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-                <span>🛎</span><span style={{ fontWeight:700, fontSize:13 }}>Services</span>
+
+          {/* Overview tab */}
+          {activeTab === "overview" && (
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+              {/* Services mini */}
+              <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:14, overflow:"hidden" }}>
+                <div style={{ padding:"14px 18px", borderBottom:"1px solid #1a1a28", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ width:28, height:28, borderRadius:8, background:"#60a5fa18", border:"1px solid #60a5fa22", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🛎</div>
+                    <span style={{ fontWeight:700, fontSize:13 }}>Top Services</span>
+                  </div>
+                  <span style={{ fontSize:11, color:"#4a4a70" }}>{services.length} total</span>
+                </div>
+                {!services.length ? (
+                  <div style={{ padding:"32px", textAlign:"center", color:"#3a3a6a", fontSize:12 }}>No service data yet.</div>
+                ) : services.slice(0,5).map((s,i) => {
+                  const pct = totalRevenue > 0 ? (parseFloat(s.revenue)/totalRevenue*100) : 0;
+                  return (
+                    <div key={i} className="ana-row" style={{ padding:"11px 18px", borderBottom:"1px solid #0f0f18", transition:"background 0.15s" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                        <span style={{ fontSize:12, fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.service_name}</span>
+                        <span style={{ fontSize:12, color:"#34d398", fontWeight:700 }}>${parseFloat(s.revenue).toFixed(2)}</span>
+                        <span style={{ fontSize:11, color:"#60a5fa", background:"#60a5fa15", borderRadius:5, padding:"1px 7px" }}>#{s.tickets}</span>
+                      </div>
+                      <div style={{ height:3, background:"#1e1e2e", borderRadius:3, overflow:"hidden" }}>
+                        <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#818cf8,#60a5fa)", borderRadius:3, transition:"width 0.5s ease" }}/>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                  <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>SERVICE</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
-                </tr></thead>
-                <tbody>
-                  {!svcSlice.length ? <tr><td colSpan={4} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No service data yet.</td></tr>
-                  : svcSlice.map((s,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #191926" }} onMouseEnter={e=>e.currentTarget.style.background="#16161f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"8px 12px", fontSize:12, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.service_name}</td>
-                      <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`# ${s.tickets}`} color="#60a5fa"/></td>
-                      <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${parseFloat(s.revenue).toFixed(2)}`} color="#34d398"/></td>
-                      <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${(parseFloat(s.revenue)*0.1).toFixed(2)}`} color="#f59e0b"/></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ padding:"8px 12px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontSize:11, color:"#5a5a80" }}>{services.length} total</span>
-                <Pagination page={svcPage} pages={svcPages} setPage={setSvcPage}/>
-              </div>
-            </div>
-            <div style={S.card}>
-              <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-                <span>👤</span><span style={{ fontWeight:700, fontSize:13 }}>Contractors</span>
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                  <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CONTRACTOR</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUT</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-                  <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>PROFITS</th>
-                </tr></thead>
-                <tbody>
-                  {!ctrSlice.length ? <tr><td colSpan={5} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No contractor data yet.</td></tr>
-                  : ctrSlice.map((w,i) => {
+
+              {/* Contractors mini + top customers */}
+              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:14, overflow:"hidden", flex:1 }}>
+                  <div style={{ padding:"14px 18px", borderBottom:"1px solid #1a1a28", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ width:28, height:28, borderRadius:8, background:"#a78bfa18", border:"1px solid #a78bfa22", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>👤</div>
+                      <span style={{ fontWeight:700, fontSize:13 }}>Contractors</span>
+                    </div>
+                    <span style={{ fontSize:11, color:"#4a4a70" }}>{workers.length} total</span>
+                  </div>
+                  {!workers.length ? (
+                    <div style={{ padding:"24px", textAlign:"center", color:"#3a3a6a", fontSize:12 }}>No contractor data yet.</div>
+                  ) : workers.slice(0,4).map((w,i) => {
                     const profit = parseFloat(w.revenue||0)*(parseFloat(w.cut_percentage||0)/100);
+                    const pct = totalRevenue > 0 ? (parseFloat(w.revenue)/totalRevenue*100) : 0;
                     return (
-                      <tr key={i} style={{ borderBottom:"1px solid #191926" }} onMouseEnter={e=>e.currentTarget.style.background="#16161f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <td style={{ padding:"8px 12px", fontSize:12, fontWeight:600 }}>{w.username}</td>
-                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`% ${w.cut_percentage||0}`} color="#e05050"/></td>
-                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`# ${w.tickets}`} color="#60a5fa"/></td>
-                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${parseFloat(w.revenue).toFixed(2)}`} color="#34d398"/></td>
-                        <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${profit.toFixed(2)}`} color="#f59e0b"/></td>
+                      <div key={i} className="ana-row" style={{ padding:"11px 18px", borderBottom:"1px solid #0f0f18", transition:"background 0.15s" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+                          <div style={{ width:26, height:26, borderRadius:"50%", background:`linear-gradient(135deg,#6c4fd8,#4a90e2)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800, flexShrink:0 }}>
+                            {w.username[0].toUpperCase()}
+                          </div>
+                          <span style={{ fontSize:12, fontWeight:600, flex:1 }}>{w.username}</span>
+                          <span style={{ fontSize:11, color:"#e05050", background:"#e0505015", borderRadius:5, padding:"1px 7px" }}>{w.cut_percentage}%</span>
+                          <span style={{ fontSize:12, color:"#34d398", fontWeight:700 }}>${profit.toFixed(2)}</span>
+                        </div>
+                        <div style={{ height:3, background:"#1e1e2e", borderRadius:3, overflow:"hidden" }}>
+                          <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#34d398,#059669)", borderRadius:3 }}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Top customers mini */}
+                <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:14, overflow:"hidden" }}>
+                  <div style={{ padding:"14px 18px", borderBottom:"1px solid #1a1a28" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ width:28, height:28, borderRadius:8, background:"#f59e0b18", border:"1px solid #f59e0b22", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🏆</div>
+                      <span style={{ fontWeight:700, fontSize:13 }}>Top Customers</span>
+                    </div>
+                  </div>
+                  {!topCustomers.length ? (
+                    <div style={{ padding:"24px", textAlign:"center", color:"#3a3a6a", fontSize:12 }}>No customer data yet.</div>
+                  ) : topCustomers.slice(0,3).map((c,i) => (
+                    <div key={i} className="ana-row" style={{ padding:"10px 18px", borderBottom:"1px solid #0f0f18", display:"flex", alignItems:"center", gap:10, transition:"background 0.15s" }}>
+                      <div style={{ width:22, height:22, borderRadius:6, background:["#f59e0b22","#9ca3af22","#cd7c0022"][i]||"#2a2a3e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:900, color:["#f59e0b","#9ca3af","#cd7c00"][i]||"#6060a0" }}>{i+1}</div>
+                      <span style={{ fontSize:12, color:"#a5b4fc", flex:1, fontWeight:500 }}>{c.username ? `@${c.username}` : c.display_name || "Unknown"}</span>
+                      <span style={{ fontSize:11, color:"#6060a0" }}>#{c.tickets||0} tickets</span>
+                      <span style={{ fontSize:12, color:"#34d398", fontWeight:700 }}>${parseFloat(c.revenue||0).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Services tab */}
+          {activeTab === "services" && (
+            <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid #1a1a28", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ fontWeight:700, fontSize:14 }}>All Services</div>
+                <span style={{ fontSize:11, color:"#4a4a70" }}>{services.length} services</span>
+              </div>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:"#0f0f18" }}>
+                    {["Service","Tickets","Revenue","Profit (est.)","Share"].map(h => (
+                      <th key={h} style={{ padding:"10px 16px", textAlign:h==="Service"?"left":"center", fontSize:10, color:"#4a4a70", fontWeight:700, textTransform:"uppercase", letterSpacing:0.8 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {!services.slice((svcPage-1)*perPage, svcPage*perPage).length ? (
+                    <tr><td colSpan={5} style={{ padding:"32px", textAlign:"center", color:"#3a3a6a", fontSize:13 }}>No service data yet.</td></tr>
+                  ) : services.slice((svcPage-1)*perPage, svcPage*perPage).map((s,i) => {
+                    const pct = totalRevenue > 0 ? (parseFloat(s.revenue)/totalRevenue*100) : 0;
+                    return (
+                      <tr key={i} className="ana-row" style={{ borderBottom:"1px solid #0f0f18", transition:"background 0.15s" }}>
+                        <td style={{ padding:"12px 16px", fontSize:12, fontWeight:600, color:"#d0d0e8" }}>{s.service_name}</td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`#${s.tickets}`} color="#60a5fa"/></td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`$${parseFloat(s.revenue).toFixed(2)}`} color="#34d398"/></td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`$${(parseFloat(s.revenue)*0.1).toFixed(2)}`} color="#f59e0b"/></td>
+                        <td style={{ padding:"10px 16px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <div style={{ flex:1, height:4, background:"#1e1e2e", borderRadius:4, overflow:"hidden" }}>
+                              <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#818cf8,#60a5fa)", borderRadius:4 }}/>
+                            </div>
+                            <span style={{ fontSize:10, color:"#6060a0", minWidth:32, textAlign:"right" }}>{pct.toFixed(0)}%</span>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              <div style={{ padding:"8px 12px", borderTop:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontSize:11, color:"#5a5a80" }}>{workers.length} total</span>
-                <Pagination page={ctrPage} pages={ctrPages} setPage={setCtrPage}/>
+              <div style={{ padding:"12px 16px", borderTop:"1px solid #1a1a28", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:11, color:"#4a4a70" }}>{services.length} total</span>
+                <Pg page={svcPage} pages={svcPages} setPage={setSvcPage}/>
               </div>
             </div>
-          </div>
-          <div style={{ display:"flex", gap:14, marginBottom:20 }}>
-            {[
-              { label:"RETURNING CUSTOMERS", value:`# ${ov.returning_customers||0}`, color:"#e05050" },
-              { label:"AVERAGE REVENUE / CUSTOMER", value:`$ ${ov.unique_customers ? (totalRevenue/parseInt(ov.unique_customers)).toFixed(0) : "0"}`, color:"#f87171" },
-              { label:"CUSTOMER RETENTION RATE", value:`% ${ov.paid_tickets&&ov.total_tickets ? ((parseInt(ov.paid_tickets)/parseInt(ov.total_tickets))*100).toFixed(0) : "0"}`, color:"#c084fc" },
-            ].map((s,i) => (
-              <div key={i} style={{ flex:1, background:s.color+"22", border:`1px solid ${s.color}44`, borderRadius:10, padding:"18px 22px", position:"relative", overflow:"hidden", minWidth:0 }}>
-                <div style={{ position:"absolute", right:16, top:12, fontSize:48, opacity:0.08, color:s.color, fontWeight:900 }}>{i===0?"↩":i===1?"$":"%"}</div>
-                <div style={{ fontSize:9, color:s.color+"cc", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:10 }}>{s.label}</div>
-                <div style={{ fontSize:34, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
+          )}
+
+          {/* Contractors tab */}
+          {activeTab === "contractors" && (
+            <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid #1a1a28", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ fontWeight:700, fontSize:14 }}>All Contractors</div>
+                <span style={{ fontSize:11, color:"#4a4a70" }}>{workers.length} contractors</span>
               </div>
-            ))}
-          </div>
-          <div style={S.card}>
-            <div style={{ padding:"10px 16px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", gap:8 }}>
-              <span>🏆</span><span style={{ fontWeight:700, fontSize:13 }}>Top Customers</span>
-            </div>
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
-              <thead><tr style={{ borderBottom:"1px solid #1e1e2e" }}>
-                <th style={{ padding:"6px 12px", textAlign:"left", fontSize:9, color:"#5a5a80", fontWeight:700 }}>CUSTOMER</th>
-                <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>TICKETS CREATED</th>
-                <th style={{ padding:"6px 8px", textAlign:"center", fontSize:9, color:"#5a5a80", fontWeight:700 }}>REVENUE</th>
-              </tr></thead>
-              <tbody>
-                {!topCustomers.length ? <tr><td colSpan={3} style={{ padding:"20px", textAlign:"center", color:"#4040a0", fontSize:12 }}>No customer data yet.</td></tr>
-                : topCustomers.slice(0,10).map((c,i) => (
-                  <tr key={i} style={{ borderBottom:"1px solid #191926" }} onMouseEnter={e=>e.currentTarget.style.background="#16161f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <td style={{ padding:"8px 12px", fontSize:12, color:"#60a5fa" }}>{c.username ? `@${c.username}` : c.display_name || "Unknown"}</td>
-                    <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`# ${c.tickets||0}`} color="#60a5fa"/></td>
-                    <td style={{ padding:"6px 8px", textAlign:"center" }}><Badge value={`$ ${parseFloat(c.revenue||0).toFixed(2)}`} color="#34d398"/></td>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:"#0f0f18" }}>
+                    {["Contractor","Cut","Tickets","Revenue","Profit","Share"].map(h => (
+                      <th key={h} style={{ padding:"10px 16px", textAlign:h==="Contractor"?"left":"center", fontSize:10, color:"#4a4a70", fontWeight:700, textTransform:"uppercase", letterSpacing:0.8 }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {!workers.slice((ctrPage-1)*perPage, ctrPage*perPage).length ? (
+                    <tr><td colSpan={6} style={{ padding:"32px", textAlign:"center", color:"#3a3a6a", fontSize:13 }}>No contractor data yet.</td></tr>
+                  ) : workers.slice((ctrPage-1)*perPage, ctrPage*perPage).map((w,i) => {
+                    const profit = parseFloat(w.revenue||0)*(parseFloat(w.cut_percentage||0)/100);
+                    const pct = totalRevenue > 0 ? (parseFloat(w.revenue)/totalRevenue*100) : 0;
+                    return (
+                      <tr key={i} className="ana-row" style={{ borderBottom:"1px solid #0f0f18", transition:"background 0.15s" }}>
+                        <td style={{ padding:"12px 16px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                            <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800 }}>{w.username[0].toUpperCase()}</div>
+                            <span style={{ fontSize:12, fontWeight:600, color:"#d0d0e8" }}>{w.username}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`${w.cut_percentage||0}%`} color="#e05050"/></td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`#${w.tickets}`} color="#60a5fa"/></td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`$${parseFloat(w.revenue).toFixed(2)}`} color="#818cf8"/></td>
+                        <td style={{ padding:"10px 8px", textAlign:"center" }}><Chip value={`$${profit.toFixed(2)}`} color="#34d398"/></td>
+                        <td style={{ padding:"10px 16px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <div style={{ flex:1, height:4, background:"#1e1e2e", borderRadius:4, overflow:"hidden" }}>
+                              <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#34d398,#059669)", borderRadius:4 }}/>
+                            </div>
+                            <span style={{ fontSize:10, color:"#6060a0", minWidth:32, textAlign:"right" }}>{pct.toFixed(0)}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{ padding:"12px 16px", borderTop:"1px solid #1a1a28", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:11, color:"#4a4a70" }}>{workers.length} total</span>
+                <Pg page={ctrPage} pages={ctrPages} setPage={setCtrPage}/>
+              </div>
+            </div>
+          )}
+
+          {/* Top customers tab */}
+          {activeTab === "customers" && (
+            <div style={{ background:"#13131a", border:"1px solid #1e1e2e", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid #1a1a28" }}>
+                <div style={{ fontWeight:700, fontSize:14 }}>Top Customers by Revenue</div>
+              </div>
+              {!topCustomers.length ? (
+                <div style={{ padding:"48px", textAlign:"center", color:"#3a3a6a", fontSize:13 }}>No customer data yet.</div>
+              ) : topCustomers.slice(0,10).map((c,i) => {
+                const maxRev = parseFloat(topCustomers[0]?.revenue||1);
+                const pct = maxRev > 0 ? (parseFloat(c.revenue||0)/maxRev*100) : 0;
+                const medals = ["🥇","🥈","🥉"];
+                return (
+                  <div key={i} className="ana-row" style={{ padding:"14px 20px", borderBottom:"1px solid #0f0f18", display:"flex", alignItems:"center", gap:14, transition:"background 0.15s" }}>
+                    <div style={{ width:32, textAlign:"center", fontSize:i<3?20:13, fontWeight:700, color:"#6060a0" }}>{medals[i]||`#${i+1}`}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:"#c0c0e0", marginBottom:6 }}>{c.username ? `@${c.username}` : c.display_name || "Unknown"}</div>
+                      <div style={{ height:4, background:"#1e1e2e", borderRadius:4, overflow:"hidden" }}>
+                        <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#818cf8,#60a5fa)", borderRadius:4, transition:"width 0.5s ease" }}/>
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right", flexShrink:0 }}>
+                      <div style={{ fontSize:14, fontWeight:800, color:"#a5b4fc" }}>${parseFloat(c.revenue||0).toFixed(2)}</div>
+                      <div style={{ fontSize:11, color:"#4a4a70", marginTop:2 }}>{c.tickets||0} tickets</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
