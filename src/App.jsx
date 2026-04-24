@@ -2066,57 +2066,171 @@ const TicketsPage = ({ selectedNode }) => {
 };
 
 // ─── INTERACTIVE CHART ───────────────────────────────────────────────────────
-const InteractiveChart = ({ data = [], height = 220 }) => {
+const InteractiveChart = ({ data = [], height = 240 }) => {
   const [hover, setHover] = useState(null);
-  if (!data.length) return <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:12 }}>No data yet</div>;
+  if (!data.length) return (
+    <div style={{ height, display:"flex", alignItems:"center", justifyContent:"center", color:"#3a3a5a", fontSize:12 }}>
+      No data for this period
+    </div>
+  );
+
+  const padL = 56, padR = 16, padT = 16, padB = 28;
   const maxRev = Math.max(...data.map(d => parseFloat(d.revenue)||0), 1);
-  const w = 800, h = height, pad = 40;
-  const revPts = data.map((d,i) => ({ x:(i/(data.length-1||1))*(w-pad*2)+pad, y:h-pad-(parseFloat(d.revenue||0)/maxRev)*(h-pad*2), d }));
-  const proPts = data.map((d,i) => ({ x:(i/(data.length-1||1))*(w-pad*2)+pad, y:h-pad-(parseFloat(d.profit||0)/maxRev)*(h-pad*2), d }));
-  const revPath = revPts.map((p,i) => `${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
-  const proPath = proPts.map((p,i) => `${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
-  const revFill = `${revPath} L${revPts[revPts.length-1].x},${h-pad} L${pad},${h-pad} Z`;
-  const yLabels = [0,0.25,0.5,0.75,1].map(t => ({ y:h-pad-(t*(h-pad*2)), label:`$${(maxRev*t).toFixed(0)}` }));
-  const step = Math.max(1, Math.floor(data.length/6));
+
+  // Nice round Y axis max
+  const magnitude = Math.pow(10, Math.floor(Math.log10(maxRev)));
+  const yMax = Math.ceil(maxRev / magnitude) * magnitude;
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
+    val: yMax * t,
+    label: yMax * t >= 1000 ? `$${((yMax*t)/1000).toFixed(1)}k` : `$${(yMax*t).toFixed(0)}`
+  }));
+
+  // Smooth bezier curve helper
+  const smooth = (pts) => {
+    if (pts.length < 2) return pts.map(p=>`L${p.x},${p.y}`).join(' ');
+    return pts.map((p, i) => {
+      if (i === 0) return `M${p.x},${p.y}`;
+      const prev = pts[i-1];
+      const cpx = (prev.x + p.x) / 2;
+      return `C${cpx},${prev.y} ${cpx},${p.y} ${p.x},${p.y}`;
+    }).join(' ');
+  };
+
+  // We use a percentage-based viewBox so the SVG scales perfectly
+  const W = 1000, H = height;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const toX = (i) => padL + (i / Math.max(data.length - 1, 1)) * chartW;
+  const toY = (val) => padT + chartH - (parseFloat(val)||0) / yMax * chartH;
+
+  const revPts = data.map((d, i) => ({ x: toX(i), y: toY(d.revenue), d }));
+  const proPts = data.map((d, i) => ({ x: toX(i), y: toY(d.profit), d }));
+
+  const revPath = smooth(revPts);
+  const proPath = smooth(proPts);
+  const revFillPath = `${revPath} L${toX(data.length-1)},${padT+chartH} L${padL},${padT+chartH} Z`;
+
+  // X axis labels — show up to 8 evenly spaced
+  const xStep = Math.max(1, Math.floor(data.length / 7));
+  const xLabels = data.map((d, i) => ({ i, d })).filter(({i}) => i % xStep === 0 || i === data.length - 1);
+
   return (
-    <div style={{ position:"relative" }}>
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width:"100%", height }} preserveAspectRatio="none" onMouseLeave={() => setHover(null)}>
+    <div style={{ position:"relative", userSelect:"none" }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width:"100%", height, display:"block" }}
+        preserveAspectRatio="none"
+        onMouseLeave={() => setHover(null)}
+      >
         <defs>
-          <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.35"/>
-            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.02"/>
+          <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.18"/>
+            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0"/>
           </linearGradient>
+          <clipPath id="chartClip">
+            <rect x={padL} y={padT} width={chartW} height={chartH}/>
+          </clipPath>
         </defs>
-        {yLabels.map((l,i) => <line key={i} x1={pad} y1={l.y} x2={w-pad} y2={l.y} stroke="#1e1e2e" strokeWidth="1"/>)}
-        <path d={revFill} fill="url(#revFill)"/>
-        <path d={revPath} fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinejoin="round"/>
-        <path d={proPath} fill="none" stroke="#34d398" strokeWidth="2" strokeLinejoin="round" strokeDasharray="6 3"/>
-        {revPts.map((p,i) => (
-          <rect key={i} x={p.x-((w-pad*2)/(data.length*2))} y={pad} width={(w-pad*2)/data.length} height={h-pad*2}
-            fill="transparent" style={{ cursor:"crosshair" }}
-            onMouseEnter={() => setHover({ ...p.d, px:p.x/w*100 })}/>
+
+        {/* Y grid lines + labels */}
+        {yTicks.map((t, i) => {
+          const y = padT + chartH - (t.val / yMax) * chartH;
+          return (
+            <g key={i}>
+              <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke="#1e1e2e" strokeWidth="1"/>
+              <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#4a4a6a" fontFamily="DM Sans, sans-serif">{t.label}</text>
+            </g>
+          );
+        })}
+
+        {/* X axis line */}
+        <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#2a2a3e" strokeWidth="1"/>
+
+        {/* Revenue fill */}
+        <path d={revFillPath} fill="url(#revGrad)" clipPath="url(#chartClip)"/>
+
+        {/* Revenue line */}
+        <path d={revPath} fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" clipPath="url(#chartClip)"/>
+
+        {/* Profit line */}
+        <path d={proPath} fill="none" stroke="#34d398" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="8 4" clipPath="url(#chartClip)"/>
+
+        {/* X axis labels */}
+        {xLabels.map(({i, d}) => (
+          <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="#4a4a6a" fontFamily="DM Sans, sans-serif">
+            {new Date(d.date).toLocaleDateString([], {month:'short', day:'numeric'})}
+          </text>
         ))}
-        {hover && (() => { const pt = revPts.find(p => p.d.date===hover.date); return pt ? <circle cx={pt.x} cy={pt.y} r="5" fill="#60a5fa" stroke="#fff" strokeWidth="2"/> : null; })()}
-        {yLabels.map((l,i) => <text key={i} x={pad-4} y={l.y+4} textAnchor="end" fontSize="9" fill="#5a5a80">{l.label}</text>)}
-        {data.map((d,i) => i%step===0 ? <text key={i} x={revPts[i]?.x} y={h-8} textAnchor="middle" fontSize="9" fill="#5a5a80">{new Date(d.date).toLocaleDateString([],{month:'short',day:'numeric'})}</text> : null)}
+
+        {/* Hover areas */}
+        {revPts.map((p, i) => (
+          <rect key={i}
+            x={i === 0 ? padL : (revPts[i-1].x + p.x)/2}
+            y={padT}
+            width={i === 0
+              ? (revPts[1] ? (revPts[1].x + p.x)/2 - padL : chartW)
+              : (i === revPts.length-1 ? p.x + chartW/data.length - (revPts[i-1].x + p.x)/2 : (p.x + (revPts[i+1]?.x||p.x))/2 - (revPts[i-1].x + p.x)/2)
+            }
+            height={chartH}
+            fill="transparent"
+            style={{ cursor:"crosshair" }}
+            onMouseEnter={() => setHover({ ...p.d, px: p.x / W * 100, py: p.y })}
+          />
+        ))}
+
+        {/* Hover dot */}
+        {hover && (() => {
+          const pt = revPts.find(p => p.d.date === hover.date);
+          const pp = proPts.find(p => p.d.date === hover.date);
+          if (!pt) return null;
+          return (
+            <g>
+              <line x1={pt.x} y1={padT} x2={pt.x} y2={padT+chartH} stroke="#2a2a3e" strokeWidth="1" strokeDasharray="4 3"/>
+              <circle cx={pt.x} cy={pt.y} r="5" fill="#60a5fa" stroke="#0d0d12" strokeWidth="2"/>
+              {pp && <circle cx={pp.x} cy={pp.y} r="4" fill="#34d398" stroke="#0d0d12" strokeWidth="2"/>}
+            </g>
+          );
+        })()}
       </svg>
+
+      {/* Tooltip */}
       {hover && (
-        <div style={{ position:"absolute", top:20, left:`${Math.min(Math.max(hover.px,10),75)}%`, transform:"translateX(-50%)",
-          background:"#16161f", border:"1px solid #2a2a3e", borderRadius:8, padding:"8px 14px", fontSize:12,
-          pointerEvents:"none", whiteSpace:"nowrap", zIndex:20, boxShadow:"0 8px 24px #00000080" }}>
-          <div style={{ fontWeight:700, color:"#e2e2f0", marginBottom:6 }}>{new Date(hover.date).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</div>
-          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:"#60a5fa", display:"inline-block" }}/>
-            <span style={{ color:"#9090b8" }}>Revenue:</span>
-            <span style={{ color:"#60a5fa", fontWeight:700 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
+        <div style={{
+          position:"absolute", top:16,
+          left:`${Math.min(Math.max(hover.px, 8), 68)}%`,
+          transform:"translateX(-50%)",
+          background:"#12121f", border:"1px solid #2a2a3e", borderRadius:10,
+          padding:"10px 14px", fontSize:12, pointerEvents:"none",
+          whiteSpace:"nowrap", zIndex:20, boxShadow:"0 8px 32px #00000099"
+        }}>
+          <div style={{ fontWeight:700, color:"#e2e2f0", marginBottom:8, fontSize:11, color:"#8080a0" }}>
+            {new Date(hover.date).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:"#34d398", display:"inline-block" }}/>
-            <span style={{ color:"#9090b8" }}>Profits:</span>
-            <span style={{ color:"#34d398", fontWeight:700 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+            <span style={{ width:8, height:8, borderRadius:"50%", background:"#60a5fa", display:"inline-block", flexShrink:0 }}/>
+            <span style={{ color:"#8080a0" }}>Revenue</span>
+            <span style={{ color:"#60a5fa", fontWeight:700, marginLeft:"auto", paddingLeft:16 }}>${parseFloat(hover.revenue||0).toFixed(2)}</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ width:8, height:8, borderRadius:"50%", background:"#34d398", display:"inline-block", flexShrink:0 }}/>
+            <span style={{ color:"#8080a0" }}>Profit</span>
+            <span style={{ color:"#34d398", fontWeight:700, marginLeft:"auto", paddingLeft:16 }}>${parseFloat(hover.profit||0).toFixed(2)}</span>
           </div>
         </div>
       )}
+
+      {/* Legend */}
+      <div style={{ display:"flex", gap:16, justifyContent:"flex-end", marginTop:8, paddingRight:4 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6060a0" }}>
+          <span style={{ width:16, height:2, background:"#60a5fa", display:"inline-block", borderRadius:2 }}/>
+          Revenue
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#6060a0" }}>
+          <span style={{ width:16, height:2, background:"#34d398", display:"inline-block", borderRadius:2, borderTop:"2px dashed #34d398", background:"none" }}/>
+          Profit
+        </div>
+      </div>
     </div>
   );
 };
