@@ -1302,6 +1302,186 @@ const RevoltSettingsTab = ({ node }) => {
   );
 };
 
+// ─── ACCOUNTING TAB ──────────────────────────────────────────────────────────
+const AccountingTab = ({ node }) => {
+  const [contractors, setContractors] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loadingContractors, setLoadingContractors] = useState(true);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [membersLoaded, setMembersLoaded] = useState(false);
+  const [editingCut, setEditingCut] = useState({});
+  const [pendingAdd, setPendingAdd] = useState({});
+  const [cutModal, setCutModal] = useState(false);
+  const [cutPct, setCutPct] = useState("10");
+
+  const loadContractors = async () => {
+    setLoadingContractors(true);
+    try {
+      const data = await api(`/nodes/${node.id}`);
+      setContractors((data.workers || []).filter(w => w.revolt_id));
+    } catch (err) { console.error(err); }
+    finally { setLoadingContractors(false); }
+  };
+
+  useEffect(() => { loadContractors(); }, [node.id]);
+
+  const loadMembers = async () => {
+    setLoadingMembers(true);
+    try {
+      const data = await api(`/nodes/${node.id}/revolt-members`);
+      setMembers(data.members || []);
+      setMembersLoaded(true);
+    } catch (err) { alert("Error: " + err.message); }
+    finally { setLoadingMembers(false); }
+  };
+
+  const addContractor = async (member) => {
+    const cut = parseFloat(pendingAdd[member.revolt_id] || 10);
+    try {
+      await api(`/nodes/${node.id}/contractors`, { method:"POST", body:{ revolt_id:member.revolt_id, username:member.username, cut_percentage:cut } });
+      setPendingAdd(p => { const n={...p}; delete n[member.revolt_id]; return n; });
+      loadContractors(); loadMembers();
+    } catch (err) { alert(err.message); }
+  };
+
+  const removeContractor = async (revoltId) => {
+    if (!confirm("Remove this contractor?")) return;
+    try {
+      await api(`/nodes/${node.id}/contractors/${revoltId}`, { method:"DELETE" });
+      loadContractors(); loadMembers();
+    } catch (err) { alert(err.message); }
+  };
+
+  const updateCut = async (revoltId, cut) => {
+    try {
+      await api(`/nodes/${node.id}/contractors/${revoltId}`, { method:"PUT", body:{ cut_percentage:parseFloat(cut) } });
+      setEditingCut(p => { const n={...p}; delete n[revoltId]; return n; });
+      loadContractors();
+    } catch (err) { alert(err.message); }
+  };
+
+  const contractorIds = new Set(contractors.map(c => c.revolt_id).filter(Boolean));
+  const nonContractors = members.filter(m => !contractorIds.has(m.revolt_id));
+
+  return (
+    <div>
+      {/* Current contractors */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ color:"#34d398" }}>💰</span>
+            <span style={{ fontWeight:700, fontSize:13 }}>Current Contractors ({contractors.length})</span>
+          </div>
+          <button onClick={() => setCutModal(true)} style={{ ...S.btnOutline, fontSize:11, padding:"4px 12px" }}>⚙ Default cut %</button>
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {loadingContractors ? (
+            <div style={{ display:"flex", gap:10, color:"#6060a0", fontSize:13 }}><Spinner size={14}/> Loading...</div>
+          ) : contractors.length === 0 ? (
+            <div style={{ color:"#4040a0", fontSize:13, textAlign:"center", padding:"20px 0" }}>No contractors yet. Add from Revolt server below.</div>
+          ) : contractors.map(w => (
+            <div key={w.id} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+              <div style={{ width:34, height:34, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:14 }}>
+                {w.username[0].toUpperCase()}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700 }}>{w.username}</div>
+                <div style={{ fontSize:11, color:"#6060a0" }}>Revolt worker</div>
+              </div>
+              {editingCut[w.revolt_id] !== undefined ? (
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <input type="number" value={editingCut[w.revolt_id]}
+                    onChange={e => setEditingCut(p => ({...p, [w.revolt_id]:e.target.value}))}
+                    style={{ ...S.input, width:60, padding:"4px 8px", fontSize:12 }}/>
+                  <span style={{ fontSize:12, color:"#6060a0" }}>%</span>
+                  <button onClick={() => updateCut(w.revolt_id, editingCut[w.revolt_id])} style={{ ...S.btn("#34d398"), fontSize:11, padding:"4px 10px" }}>✓</button>
+                  <button onClick={() => setEditingCut(p => { const n={...p}; delete n[w.revolt_id]; return n; })} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>✕</button>
+                </div>
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 10px", fontSize:12, fontWeight:700 }}>{w.cut_percentage}%</span>
+                  <button onClick={() => setEditingCut(p => ({...p, [w.revolt_id]:String(w.cut_percentage)}))} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>Edit</button>
+                  <button onClick={() => removeContractor(w.revolt_id)} style={{ ...S.btn("#e05050"), fontSize:11, padding:"4px 10px" }}>Remove</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Add from Revolt server */}
+      <div style={{ ...S.card, marginBottom:16 }}>
+        <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1e2e", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ color:"#f87171" }}>⚡</span>
+            <span style={{ fontWeight:700, fontSize:13 }}>Add from Revolt Server</span>
+          </div>
+          {membersLoaded && (
+            <button onClick={loadMembers} disabled={loadingMembers} style={{ ...S.btnOutline, fontSize:11, padding:"4px 12px", display:"flex", alignItems:"center", gap:6 }}>
+              {loadingMembers ? <Spinner size={12}/> : "↻"} Refresh
+            </button>
+          )}
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          {!membersLoaded ? (
+            <div style={{ textAlign:"center", padding:"24px 0" }}>
+              <p style={{ color:"#6060a0", fontSize:13, marginBottom:14 }}>Load all members from your Revolt server to add them as contractors.</p>
+              <button onClick={loadMembers} disabled={loadingMembers} style={{ ...S.btn(), fontSize:13, margin:"0 auto" }}>
+                {loadingMembers ? <><Spinner size={14}/> Loading members...</> : "⚡ Load Revolt Members"}
+              </button>
+            </div>
+          ) : loadingMembers ? (
+            <div style={{ display:"flex", gap:10, color:"#6060a0", fontSize:13 }}><Spinner size={14}/> Refreshing...</div>
+          ) : nonContractors.length === 0 ? (
+            <div style={{ color:"#4040a0", fontSize:13, textAlign:"center", padding:"16px 0" }}>All server members are already contractors.</div>
+          ) : nonContractors.map(m => (
+            <div key={m.revolt_id} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:10, padding:"10px 16px", display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+              <div style={{ width:30, height:30, borderRadius:"50%", background:"#2a2a4e", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:12, color:"#a78bfa" }}>
+                {m.username[0]?.toUpperCase()||"?"}
+              </div>
+              <span style={{ flex:1, fontSize:13, fontWeight:600 }}>{m.username}</span>
+              {pendingAdd[m.revolt_id] !== undefined ? (
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <input type="number" value={pendingAdd[m.revolt_id]}
+                    onChange={e => setPendingAdd(p => ({...p, [m.revolt_id]:e.target.value}))}
+                    style={{ ...S.input, width:60, padding:"4px 8px", fontSize:12 }}
+                    placeholder="10"/>
+                  <span style={{ fontSize:12, color:"#6060a0" }}>%</span>
+                  <button onClick={() => addContractor(m)} style={{ ...S.btn("#34d398"), fontSize:11, padding:"4px 12px" }}>✓ Add</button>
+                  <button onClick={() => setPendingAdd(p => { const n={...p}; delete n[m.revolt_id]; return n; })} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => setPendingAdd(p => ({...p, [m.revolt_id]:"10"}))} style={{ ...S.btn(), fontSize:11, padding:"5px 14px" }}>+ Add</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Default cut modal */}
+      {cutModal && (
+        <div style={{ position:"fixed", inset:0, background:"#00000088", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200 }} onClick={() => setCutModal(false)}>
+          <div style={{ ...S.card, padding:"28px", width:380 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <h3 style={{ fontSize:16, fontWeight:700 }}>Default cut percentage</h3>
+              <button style={{ ...S.btnOutline, padding:"4px 10px" }} onClick={() => setCutModal(false)}>✕</button>
+            </div>
+            <label style={{ display:"block", fontSize:12, color:"#8080a0", marginBottom:6 }}>New contractors will default to this cut %</label>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:24 }}>
+              <input style={S.input} value={cutPct} onChange={e=>setCutPct(e.target.value)} type="number"/>
+              <span style={{ color:"#6060a0", fontSize:13 }}>%</span>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button style={{ ...S.btn("#34d398"), flex:1, justifyContent:"center" }} onClick={() => setCutModal(false)}>Save</button>
+              <button style={S.btnOutline} onClick={() => setCutModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── RESTART MENU ────────────────────────────────────────────────────────────
 const RestartMenu = ({ nodeId }) => {
   const [open, setOpen] = useState(false);
@@ -1516,40 +1696,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
           )}
 
           {/* ── ACCOUNTING ── */}
-          {tab==="Accounting" && (
-            <div>
-              <SectionCard icon="💰" title="Accounting Settings" color="#34d398">
-                <h3 style={{ fontSize:16, fontWeight:800, marginBottom:6 }}>Accounting customisation</h3>
-                <p style={{ fontSize:13, color:"#6060a0", marginBottom:20, lineHeight:1.7 }}>
-                  Customize your accounting settings and streamline your financial management. Configure automatic payout requests, adjust default cut percentages, and manage your contractors and accounting settings all in one place.
-                </p>
-                <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>General customisation</div>
-                <div style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:"#34d398" }}>💲 Default cut percentage</div>
-                    <div style={{ fontSize:12, color:"#6060a0", marginTop:2 }}>Change the default cut percentage that gets set when new contractors are added.</div>
-                  </div>
-                  <button onClick={() => setCutModal(true)} style={{ ...S.btnOutline, fontSize:11, padding:"4px 12px" }}>···</button>
-                </div>
-
-                <div style={{ marginTop:20 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Workers ({nodeData?.workers?.length||0})</div>
-                  {!nodeData?.workers?.length ? (
-                    <div style={{ color:"#4040a0", fontSize:13 }}>No workers assigned yet.</div>
-                  ) : nodeData.workers.map(w => (
-                    <div key={w.id} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
-                      <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700 }}>{w.username[0].toUpperCase()}</div>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:700 }}>{w.username}</div>
-                        <div style={{ fontSize:11, color:"#6060a0", textTransform:"capitalize" }}>{w.role}</div>
-                      </div>
-                      <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>{w.cut_percentage}% cut</span>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-            </div>
-          )}
+          {tab==="Accounting" && <AccountingTab node={node}/>}
         </>
       )}
 
