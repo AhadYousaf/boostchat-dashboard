@@ -1302,6 +1302,43 @@ const RevoltSettingsTab = ({ node }) => {
   );
 };
 
+// ─── RESTART MENU ────────────────────────────────────────────────────────────
+const RestartMenu = ({ nodeId }) => {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(null);
+
+  const restart = async (platform) => {
+    setLoading(platform); setOpen(false);
+    try {
+      const res = await api(`/nodes/${nodeId}/restart-bot?platform=${platform}`, { method: "POST" });
+      alert(`✅ ${res.message || platform + " bot restarted!"}`);
+    } catch (err) { alert("❌ " + err.message); }
+    finally { setLoading(null); }
+  };
+
+  return (
+    <div style={{ position:"relative" }}>
+      <button onClick={() => setOpen(v=>!v)} disabled={!!loading}
+        style={{ ...S.btn("#e05050"), fontSize:12, opacity: loading ? 0.6 : 1 }}>
+        {loading ? <Spinner size={12}/> : "↻"} {loading ? `Restarting ${loading}...` : "Restart bot processes ▾"}
+      </button>
+      {open && (
+        <div style={{ position:"absolute", right:0, top:36, background:"#16161f", border:"1px solid #2a2a3e", borderRadius:10, zIndex:50, boxShadow:"0 8px 24px #00000090", minWidth:200, overflow:"hidden" }}
+          onClick={e=>e.stopPropagation()}>
+          <button onClick={() => restart("telegram")}
+            style={{ width:"100%", padding:"11px 16px", background:"transparent", border:"none", color:"#60a5fa", cursor:"pointer", fontSize:13, textAlign:"left", borderBottom:"1px solid #1e1e2e", fontWeight:600, display:"flex", alignItems:"center", gap:8 }}>
+            ✈ Restart Telegram bot
+          </button>
+          <button onClick={() => restart("revolt")}
+            style={{ width:"100%", padding:"11px 16px", background:"transparent", border:"none", color:"#f87171", cursor:"pointer", fontSize:13, textAlign:"left", fontWeight:600, display:"flex", alignItems:"center", gap:8 }}>
+            ⚡ Restart Revolt bot
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
 const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
   const [tab, setTab] = useState(initialTab || "Node Overview");
@@ -1389,7 +1426,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
           <h1 style={{ margin:"0 0 4px", fontSize:22, fontWeight:800 }}>{node.name}</h1>
           <p style={{ margin:0, color:"#6060a0", fontSize:13 }}>Manage, customize and configure your BoostChat node.</p>
         </div>
-        <button style={{ ...S.btn("#e05050"), fontSize:12 }}>↻ Restart bot processes ▾</button>
+        <RestartMenu nodeId={node.id}/>
       </div>
 
       <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:"1px solid #1e1e2e" }}>
@@ -1432,7 +1469,12 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
                       ))}
                     </div>
                     <div style={{ marginTop:14 }}>
-                      <button style={{ ...S.btn("#e05050"), fontSize:12 }}>↻ Restart Telegram bot</button>
+                      <button onClick={async () => {
+                      try {
+                        await api(`/nodes/${node.id}/restart-bot?platform=telegram`, { method:"POST" });
+                        alert("✅ Telegram bot restarted successfully!");
+                      } catch (err) { alert("❌ " + err.message); }
+                    }} style={{ ...S.btn("#e05050"), fontSize:12 }}>↻ Restart Telegram bot</button>
                     </div>
                   </SectionCard>
                 ))}
