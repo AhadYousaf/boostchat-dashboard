@@ -1586,17 +1586,7 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
       setNodeData(data);
     } catch (err) { alert(err.message); }
   };
-  const handleDuplicate = async () => {
-    if (!duplicateName.trim()) { setDuplicateError("Node name is required"); return; }
-    setDuplicating(true); setDuplicateError("");
-    try {
-      const data = await api(`/nodes/${node.id}/duplicate`, { method: "POST", body: { new_name: duplicateName.trim() } });
-      alert(`✅ Node duplicated! Created: ${data.new_node.name}`);
-      setDuplicateModal(false); setDuplicateName(""); refreshNodes();
-    } catch (err) { setDuplicateError(err.message); }
-    finally { setDuplicating(false); }
-  };
-
+ 
   const tabs = ["Node Overview","Telegram","BoostChat","Webapp","Accounting"];
   const tabColors = { "Node Overview":"#a78bfa", "Telegram":"#60a5fa", "BoostChat":"#f87171", "Webapp":"#c084fc", "Accounting":"#34d398" };
 
