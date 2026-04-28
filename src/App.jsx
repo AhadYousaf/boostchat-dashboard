@@ -1522,6 +1522,10 @@ const RestartMenu = ({ nodeId }) => {
 // ─── NODE DETAIL ─────────────────────────────────────────────────────────────
 const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
   const [tab, setTab] = useState(initialTab || "Node Overview");
+  const [duplicateModal, setDuplicateModal] = useState(false);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState("");
   const [nodeData, setNodeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cutModal, setCutModal] = useState(false);
@@ -1563,6 +1567,17 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
     finally { setAddingBot(false); }
   };
 
+  const handleDuplicate = async () => {
+    if (!duplicateName.trim()) { setDuplicateError("Node name is required"); return; }
+    setDuplicating(true); setDuplicateError("");
+    try {
+      const data = await api(`/nodes/${node.id}/duplicate`, { method: "POST", body: { new_name: duplicateName.trim() } });
+      alert(`✅ Node duplicated! Created: ${data.new_node.name}`);
+      setDuplicateModal(false); setDuplicateName(""); refreshNodes();
+    } catch (err) { setDuplicateError(err.message); }
+    finally { setDuplicating(false); }
+  };
+
   const removeBot = async (botId) => {
     if (!confirm("Remove this bot?")) return;
     try {
@@ -1570,6 +1585,16 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
       const data = await api(`/nodes/${node.id}`);
       setNodeData(data);
     } catch (err) { alert(err.message); }
+  };
+  const handleDuplicate = async () => {
+    if (!duplicateName.trim()) { setDuplicateError("Node name is required"); return; }
+    setDuplicating(true); setDuplicateError("");
+    try {
+      const data = await api(`/nodes/${node.id}/duplicate`, { method: "POST", body: { new_name: duplicateName.trim() } });
+      alert(`✅ Node duplicated! Created: ${data.new_node.name}`);
+      setDuplicateModal(false); setDuplicateName(""); refreshNodes();
+    } catch (err) { setDuplicateError(err.message); }
+    finally { setDuplicating(false); }
   };
 
   const tabs = ["Node Overview","Telegram","BoostChat","Webapp","Accounting"];
@@ -1606,7 +1631,11 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
           <h1 style={{ margin:"0 0 4px", fontSize:22, fontWeight:800 }}>{node.name}</h1>
           <p style={{ margin:0, color:"#6060a0", fontSize:13 }}>Manage, customize and configure your BoostChat node.</p>
         </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={() => { setDuplicateName(node.name + " Copy"); setDuplicateModal(true); }}
+            style={{ ...S.btn("#60a5fa"), fontSize:12 }}>📋 Duplicate</button>
         <RestartMenu nodeId={node.id}/>
+      </div>
       </div>
 
       <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:"1px solid #1e1e2e" }}>
@@ -1698,6 +1727,29 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
           {/* ── ACCOUNTING ── */}
           {tab==="Accounting" && <AccountingTab node={node}/>}
         </>
+      )}
+      
+      {/* Duplicate Modal */}
+      {duplicateModal && (
+        <div style={{ position:"fixed", inset:0, background:"#00000088", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200 }} onClick={() => setDuplicateModal(false)}>
+          <div style={{ ...S.card, padding:"28px", width:480 }} onClick={e=>e.stopPropagation()}>
+            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:20 }}>📋 Duplicate Node</h3>
+            <div style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px", marginBottom:16, fontSize:11, color:"#6060a0" }}>
+              <div style={{ marginBottom:8 }}>✅ Copies: Services, Questions, Commands, Revolt Config</div>
+              <div style={{ color:"#f59e0b" }}>⚠ Does NOT copy: Bots, Tickets, Customers</div>
+            </div>
+            <label style={{ display:"block", fontSize:12, color:"#8080a0", marginBottom:6 }}>New Node Name</label>
+            <input style={S.input} value={duplicateName} onChange={e => setDuplicateName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleDuplicate()} autoFocus/>
+            {duplicateError && <div style={{ color:"#f87171", fontSize:12, marginTop:8 }}>⚠ {duplicateError}</div>}
+            <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
+              <button style={S.btnOutline} onClick={() => setDuplicateModal(false)}>Cancel</button>
+              <button style={{ ...S.btn("#60a5fa"), opacity: duplicating ? 0.6 : 1 }} disabled={duplicating} onClick={handleDuplicate}>
+                {duplicating ? <><Spinner size={14}/> Duplicating...</> : "Duplicate"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Cut % Modal */}
