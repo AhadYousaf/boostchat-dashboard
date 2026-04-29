@@ -3344,8 +3344,8 @@ export default function App() {
   );
 
   if (!user) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinToken = urlParams.get("join");
+    const pathMatch = window.location.pathname.match(/^\/join\/(.+)$/);
+    const joinToken = pathMatch ? pathMatch[1] : null;
     if (joinToken) return <JoinPage token={joinToken}/>;
     return <LoginPage onLogin={setUser}/>;
   }
