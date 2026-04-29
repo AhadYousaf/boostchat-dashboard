@@ -1526,6 +1526,10 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
   const [duplicateName, setDuplicateName] = useState("");
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState("");
+  const [inviteModal, setInviteModal] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [nodeData, setNodeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cutModal, setCutModal] = useState(false);
@@ -1578,6 +1582,21 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
     finally { setDuplicating(false); }
   };
 
+  const generateInvite = async () => {
+    setGenerating(true); setInviteUrl(""); setCopied(false);
+    try {
+      const data = await api(`/invites`, { method: "POST", body: { source_node_id: node.id } });
+      setInviteUrl(data.url);
+    } catch (err) { alert("Error: " + err.message); }
+    finally { setGenerating(false); }
+  };
+
+  const copyInviteUrl = () => {
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const removeBot = async (botId) => {
     if (!confirm("Remove this bot?")) return;
     try {
@@ -1622,6 +1641,8 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
           <p style={{ margin:0, color:"#6060a0", fontSize:13 }}>Manage, customize and configure your BoostChat node.</p>
         </div>
         <div style={{ display:"flex", gap:8 }}>
+          <button onClick={() => { setInviteModal(true); setInviteUrl(""); }}
+            style={{ ...S.btn("#a78bfa"), fontSize:12 }}>📨 Invite Customer</button>
           <button onClick={() => { setDuplicateName(node.name + " Copy"); setDuplicateModal(true); }}
             style={{ ...S.btn("#60a5fa"), fontSize:12 }}>📋 Duplicate</button>
         <RestartMenu nodeId={node.id}/>
@@ -1737,6 +1758,43 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
               <button style={{ ...S.btn("#60a5fa"), opacity: duplicating ? 0.6 : 1 }} disabled={duplicating} onClick={handleDuplicate}>
                 {duplicating ? <><Spinner size={14}/> Duplicating...</> : "Duplicate"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Invite Customer Modal */}
+      {inviteModal && (
+        <div style={{ position:"fixed", inset:0, background:"#00000088", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200 }} onClick={() => setInviteModal(false)}>
+          <div style={{ ...S.card, padding:"28px", width:520 }} onClick={e=>e.stopPropagation()}>
+            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:6 }}>📨 Invite a Customer</h3>
+            <p style={{ fontSize:12, color:"#6060a0", marginBottom:16 }}>Generate a single-use link. When the customer signs up, they'll get their own copy of <span style={{ color:"#a78bfa", fontWeight:700 }}>{node.name}</span>.</p>
+            <div style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px", marginBottom:16, fontSize:11, color:"#6060a0" }}>
+              <div style={{ marginBottom:6 }}>✅ Customer becomes the OWNER of their own copy</div>
+              <div style={{ marginBottom:6 }}>✅ Services, Questions, Commands all pre-configured</div>
+              <div style={{ color:"#f59e0b" }}>🔒 Link is single-use — works once only</div>
+            </div>
+            {!inviteUrl ? (
+              <button onClick={generateInvite} disabled={generating}
+                style={{ ...S.btn("#a78bfa"), width:"100%", justifyContent:"center", padding:"12px", fontSize:13, opacity: generating ? 0.6 : 1 }}>
+                {generating ? <><Spinner size={14}/> Generating...</> : "🔗 Generate Invite Link"}
+              </button>
+            ) : (
+              <>
+                <label style={{ display:"block", fontSize:11, color:"#6060a0", fontWeight:700, marginBottom:6, letterSpacing:0.8 }}>YOUR INVITE LINK</label>
+                <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+                  <input readOnly value={inviteUrl} style={{ ...S.input, fontSize:11, fontFamily:"monospace" }} onClick={e => e.target.select()}/>
+                  <button onClick={copyInviteUrl} style={{ ...S.btn(copied?"#34d398":"#7c5af0"), fontSize:12, whiteSpace:"nowrap" }}>
+                    {copied ? "✓ Copied!" : "📋 Copy"}
+                  </button>
+                </div>
+                <div style={{ background:"#34d39811", border:"1px solid #34d39833", borderRadius:8, padding:"10px 14px", fontSize:11, color:"#34d398", marginBottom:16 }}>
+                  ✓ Send this link to your customer. They'll create an account and get their own node.
+                </div>
+                <button onClick={generateInvite} style={{ ...S.btnOutline, fontSize:12 }}>↻ Generate New Link</button>
+              </>
+            )}
+            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:20 }}>
+              <button style={S.btnOutline} onClick={() => setInviteModal(false)}>Close</button>
             </div>
           </div>
         </div>
@@ -3097,6 +3155,115 @@ const SettingsPage = ({ user, onUpdate }) => {
     </div>
   );
 };
+// ─── JOIN PAGE (Invite Acceptance) ────────────────────────────────────────────
+const JoinPage = ({ token }) => {
+  const [invite, setInvite] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({ username:"", email:"", password:"" });
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const validateInvite = async () => {
+      try {
+        const data = await api(`/invites/${token}`);
+        setInvite(data);
+      } catch (err) { setError(err.message); }
+      finally { setLoading(false); }
+    };
+    validateInvite();
+  }, [token]);
+
+  const handleAccept = async (e) => {
+    e.preventDefault();
+    if (!form.username || !form.password) { setError("Username and password required"); return; }
+    if (form.password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    setSubmitting(true); setError("");
+    try {
+      const data = await api(`/invites/${token}/accept`, { method:"POST", body:form });
+      localStorage.setItem("oc_token", data.token);
+      setSuccess(true);
+      setTimeout(() => { window.location.href = "/"; }, 1500);
+    } catch (err) { setError(err.message); setSubmitting(false); }
+  };
+
+  if (loading) return (
+    <div style={{ ...S.root, alignItems:"center", justifyContent:"center" }}>
+      <style>{`@keyframes spin { to { transform:rotate(360deg); } } * { box-sizing:border-box; margin:0; padding:0; }`}</style>
+      <Spinner size={32}/>
+    </div>
+  );
+
+  if (error && !invite) return (
+    <div style={{ ...S.root, alignItems:"center", justifyContent:"center", padding:20 }}>
+      <style>{`* { box-sizing:border-box; margin:0; padding:0; }`}</style>
+      <div style={{ ...S.card, padding:"40px", maxWidth:440, width:"100%", textAlign:"center" }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>⚠</div>
+        <h2 style={{ fontSize:20, fontWeight:800, marginBottom:8, color:"#f87171" }}>Invalid Invite</h2>
+        <p style={{ color:"#6060a0", fontSize:14, marginBottom:20 }}>{error}</p>
+        <a href="/" style={{ ...S.btn(), display:"inline-flex", textDecoration:"none" }}>← Back to Login</a>
+      </div>
+    </div>
+  );
+
+  if (success) return (
+    <div style={{ ...S.root, alignItems:"center", justifyContent:"center", padding:20 }}>
+      <style>{`* { box-sizing:border-box; margin:0; padding:0; }`}</style>
+      <div style={{ ...S.card, padding:"40px", maxWidth:440, width:"100%", textAlign:"center" }}>
+        <div style={{ fontSize:64, marginBottom:16 }}>🎉</div>
+        <h2 style={{ fontSize:22, fontWeight:800, marginBottom:8, color:"#34d398" }}>Welcome aboard!</h2>
+        <p style={{ color:"#6060a0", fontSize:14 }}>Your account has been created. Redirecting...</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:"flex", height:"100vh", background:"#080810", fontFamily:"'DM Sans','Segoe UI',sans-serif", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        * { box-sizing:border-box; margin:0; padding:0; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        input::placeholder { color:#3a3a6a; }
+      `}</style>
+      <div style={{ ...S.card, padding:"40px", maxWidth:480, width:"100%" }}>
+        <div style={{ textAlign:"center", marginBottom:28 }}>
+          <div style={{ width:60, height:60, borderRadius:14, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, margin:"0 auto 16px" }}>📨</div>
+          <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:24, fontWeight:800, marginBottom:8, color:"#e8e8f5" }}>You've been invited!</h1>
+          <p style={{ color:"#8080a0", fontSize:14, lineHeight:1.6 }}>
+            <span style={{ color:"#a78bfa", fontWeight:700 }}>{invite.inviter_username}</span> invited you to BoostChat
+          </p>
+        </div>
+        <div style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:10, padding:"14px 16px", marginBottom:24 }}>
+          <div style={{ fontSize:11, color:"#6060a0", fontWeight:700, marginBottom:6 }}>YOU'LL GET YOUR OWN COPY OF</div>
+          <div style={{ fontSize:18, fontWeight:800, color:"#a78bfa" }}>📋 {invite.node_name}</div>
+          <div style={{ fontSize:11, color:"#5060a0", marginTop:6, lineHeight:1.5 }}>
+            ✅ All services, questions, and commands pre-configured<br/>
+            ✅ You'll be the owner — add your own bots & start receiving tickets
+          </div>
+        </div>
+        <form onSubmit={handleAccept}>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#6060a0", marginBottom:6, letterSpacing:0.8 }}>USERNAME</label>
+            <input style={S.input} value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="Choose a username..." autoFocus/>
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#6060a0", marginBottom:6, letterSpacing:0.8 }}>EMAIL (optional)</label>
+            <input style={S.input} type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="your@email.com"/>
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#6060a0", marginBottom:6, letterSpacing:0.8 }}>PASSWORD</label>
+            <input style={S.input} type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="At least 6 characters..."/>
+          </div>
+          {error && <div style={{ background:"#e0505018", border:"1px solid #e0505044", borderRadius:8, padding:"10px 14px", color:"#f87171", fontSize:12, marginBottom:16 }}>⚠ {error}</div>}
+          <button type="submit" disabled={submitting} style={{ ...S.btn("#7c5af0"), width:"100%", justifyContent:"center", padding:"12px", fontSize:14, opacity:submitting?0.6:1 }}>
+            {submitting ? <><Spinner size={16}/> Creating account...</> : "Accept Invite & Create Account →"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
@@ -3176,7 +3343,12 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <LoginPage onLogin={setUser}/>;
+  if (!user) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinToken = urlParams.get("join");
+    if (joinToken) return <JoinPage token={joinToken}/>;
+    return <LoginPage onLogin={setUser}/>;
+  }
 
   const renderPage = () => {
     switch(page) {
