@@ -1060,7 +1060,7 @@ const RevoltSettingsTab = ({ node }) => {
       setFetchingCategories(false);
     }
   };
-  const autoMatchCategories = () => {
+ const autoMatchCategories = () => {
     if (categories.length === 0) {
       alert("No categories loaded. Make sure your Guild ID is correct.");
       return;
@@ -1080,7 +1080,9 @@ const RevoltSettingsTab = ({ node }) => {
     let matchedClosed = 0;
     let unmatched = [];
 
-    const updatedServices = services.map(service => {
+    const newServiceCategories = { ...serviceCategories };
+
+    services.forEach(service => {
       const serviceNameNorm = normalize(service.name);
       
       // Find OPEN category - exact normalized match (no ❌ in category)
@@ -1097,15 +1099,15 @@ const RevoltSettingsTab = ({ node }) => {
       if (closedCategory) matchedClosed++;
       if (!openCategory && !closedCategory) unmatched.push(service.name);
 
-      return {
-        ...service,
-        open_category: openCategory?.id || service.open_category || "",
-        claimed_category: openCategory?.id || service.claimed_category || "", // Same as open
-        closed_category: closedCategory?.id || service.closed_category || ""
+      newServiceCategories[service.id] = {
+        ...newServiceCategories[service.id],
+        open: openCategory?.id || newServiceCategories[service.id]?.open || "",
+        claimed: openCategory?.id || newServiceCategories[service.id]?.claimed || "", // Same as open
+        closed: closedCategory?.id || newServiceCategories[service.id]?.closed || ""
       };
     });
 
-    setServices(updatedServices);
+    setServiceCategories(newServiceCategories);
 
     // Show summary
     let msg = `🪄 Auto-Match Results:\n\n`;
@@ -1118,6 +1120,8 @@ const RevoltSettingsTab = ({ node }) => {
     msg += `\n\n💡 Click "Save All Settings" to apply changes.`;
     alert(msg);
   };
+
+  
   const saveSettings = async () => {
     if (!revoltGuildId) { setError("Guild ID is required"); return; }
     setSaving(true);
