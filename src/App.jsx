@@ -67,7 +67,7 @@ const LoginPage = ({ onLogin }) => {
         <div style={{ position:"absolute", top:"40%", left:"40%", transform:"translate(-50%,-50%)", width:500, height:500, background:"radial-gradient(circle,rgba(124,90,240,0.1),transparent 70%)", pointerEvents:"none" }}/>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <a href="/landing.html" style={{ display:"flex", alignItems:"center", gap:10, textDecoration:"none" }}>
-            <div style={{ width:36, height:36, borderRadius:9, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>⚡</div>
+            <img src="/logo.png" alt="BoostChat" style={{ width:36, height:36, borderRadius:9 }}/>
             <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:19, color:"#e8e8f5" }}>Boost<span style={{ color:"#7c5af0" }}>Chat</span></span>
           </a>
           <a href="/landing.html" style={{ display:"flex", alignItems:"center", gap:6, color:"#6060a0", fontSize:13, textDecoration:"none", border:"1px solid #1e1e35", borderRadius:8, padding:"6px 14px" }}>← Back to site</a>
@@ -149,7 +149,7 @@ const MiniChart = ({ data = [], color = "#6c4fd8", valueKey = "revenue" }) => {
 const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode, showUserMenu, setShowUserMenu }) => (
   <div style={S.topbar}>
     <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); }}>
-      <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>⚡</div>
+      <img src="/logo.png" alt="BoostChat" style={{ width:30, height:30, borderRadius:8 }}/>
       <span style={{ fontWeight:800, fontSize:15, background:"linear-gradient(90deg,#a78bfa,#60a5fa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>BoostChat</span>
     </div>
     <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -3257,7 +3257,7 @@ const SettingsPage = ({ user, onUpdate }) => {
       <p style={{ margin:"0 0 24px", color:"#6060a0", fontSize:13 }}>Modify account information, and change critical settings for your account.</p>
       <div style={{ ...S.card, marginBottom:28, overflow:"hidden", position:"relative", height:190 }}>
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,#1a1035,#2d1b60,#0d1525)" }}/>
-        <div style={{ position:"absolute", right:40, top:"50%", transform:"translateY(-50%)", fontSize:130, opacity:0.07 }}>⚡</div>
+        <img src="/logo.png" alt="BoostChat" style={{ width:76, height:76, borderRadius:20, border:"3px solid #ffffff18" }}/>
         <div style={{ position:"relative", zIndex:1, padding:"28px", display:"flex", alignItems:"center", gap:20 }}>
           <div style={{ width:76, height:76, borderRadius:20, background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:36, fontWeight:900, border:"3px solid #ffffff18" }}>
             {user?.username?.[0]?.toUpperCase()||"U"}
@@ -3403,7 +3403,7 @@ const JoinPage = ({ token }) => {
       `}</style>
       <div style={{ ...S.card, padding:"40px", maxWidth:480, width:"100%" }}>
         <div style={{ textAlign:"center", marginBottom:28 }}>
-          <div style={{ width:60, height:60, borderRadius:14, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, margin:"0 auto 16px" }}>📨</div>
+          <img src="/logo.png" alt="BoostChat" style={{ width:60, height:60, borderRadius:14, margin:"0 auto 16px", display:"block" }}/>
           <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:24, fontWeight:800, marginBottom:8, color:"#e8e8f5" }}>You've been invited!</h1>
           <p style={{ color:"#8080a0", fontSize:14, lineHeight:1.6 }}>
             <span style={{ color:"#a78bfa", fontWeight:700 }}>{invite.inviter_username}</span> invited you to BoostChat
