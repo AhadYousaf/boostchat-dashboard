@@ -1086,14 +1086,15 @@ const RevoltSettingsTab = ({ node }) => {
       const serviceNameNorm = normalize(service.name);
       
       // Find OPEN category - exact normalized match (no ❌ in category)
-      const openCategory = categories.find(cat => 
-        !cat.title.includes("❌") && normalize(cat.title) === serviceNameNorm
-      );
+      const openCategory = categories.find(cat => {
+        const t = cat.title || cat.name || "";
+        return !t.includes("❌") && normalize(t) === serviceNameNorm;
+      });
       
-      // Find CLOSED category - must end with ❌
-      const closedCategory = categories.find(cat =>
-        cat.title.includes("❌") && normalizeClosed(cat.title) === serviceNameNorm
-      );
+      const closedCategory = categories.find(cat => {
+        const t = cat.title || cat.name || "";
+        return t.includes("❌") && normalizeClosed(t) === serviceNameNorm;
+      });
 
       if (openCategory) matchedOpen++;
       if (closedCategory) matchedClosed++;
