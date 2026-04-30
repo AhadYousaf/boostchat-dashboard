@@ -1663,6 +1663,8 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
   const [loading, setLoading] = useState(true);
   const [cutModal, setCutModal] = useState(false);
   const [cutPct, setCutPct] = useState("10");
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
 
   // Telegram tab state
   const [commands, setCommands] = useState([{ cmd:"/start", desc:"Start a brand new conversation with us #1" }]);
@@ -1834,7 +1836,51 @@ const NodeDetailPage = ({ node, setPage, refreshNodes, initialTab }) => {
               <div style={S.card}>
                 <div style={{ padding:"14px 18px", borderBottom:"1px solid #1e1e2e", fontWeight:700, fontSize:13 }}>Node info</div>
                 <div style={{ padding:"16px 18px" }}>
-                  {[["Node name",nodeData?.node?.name],["Timezone",nodeData?.node?.timezone],["Type",nodeData?.node?.type],["Status",nodeData?.node?.status],["Creation",nodeData?.node?.created_at?`Created ${new Date(nodeData.node.created_at).toLocaleDateString()}`:"—"]].map(([k,v]) => (
+                  {/* Node name with rename */}
+                  <div style={{ fontSize:13, marginBottom:10 }}>
+                    <div style={{ color:"#6060a0", fontSize:11, marginBottom:2 }}>⊙ Node name</div>
+                    {editingName ? (
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        <input
+                          autoFocus
+                          value={newName}
+                          onChange={e => setNewName(e.target.value)}
+                          onKeyDown={async e => {
+                            if (e.key === "Enter") {
+                              try {
+                                await api(`/nodes/${node.id}`, { method:"PUT", body:{ name: newName.trim() } });
+                                setNodeData({ ...nodeData, node: { ...nodeData.node, name: newName.trim() } });
+                                setEditingName(false);
+                                if (refreshNodes) refreshNodes();
+                              } catch (err) { alert(err.message); }
+                            } else if (e.key === "Escape") setEditingName(false);
+                          }}
+                          style={{ ...S.input, fontSize:13, padding:"4px 8px", flex:1 }}
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api(`/nodes/${node.id}`, { method:"PUT", body:{ name: newName.trim() } });
+                              setNodeData({ ...nodeData, node: { ...nodeData.node, name: newName.trim() } });
+                              setEditingName(false);
+                              if (refreshNodes) refreshNodes();
+                            } catch (err) { alert(err.message); }
+                          }}
+                          style={{ ...S.btn("#34d398"), fontSize:11, padding:"4px 10px" }}
+                        >✓</button>
+                        <button onClick={() => setEditingName(false)} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>✕</button>
+                      </div>
+                    ) : (
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <span>{nodeData?.node?.name || "—"}</span>
+                        <button
+                          onClick={() => { setNewName(nodeData?.node?.name || ""); setEditingName(true); }}
+                          style={{ ...S.btnOutline, fontSize:10, padding:"2px 8px" }}
+                        >✎ Rename</button>
+                      </div>
+                    )}
+                  </div>
+                  {[["Timezone",nodeData?.node?.timezone],["Type",nodeData?.node?.type],["Status",nodeData?.node?.status],["Creation",nodeData?.node?.created_at?`Created ${new Date(nodeData.node.created_at).toLocaleDateString()}`:"—"]].map(([k,v]) => (
                     <div key={k} style={{ fontSize:13, marginBottom:10 }}>
                       <div style={{ color:"#6060a0", fontSize:11, marginBottom:2 }}>⊙ {k}</div>
                       <div style={{ color:v==="active"?"#34d398":"#e2e2f0" }}>{v||"—"}</div>
