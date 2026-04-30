@@ -1060,7 +1060,64 @@ const RevoltSettingsTab = ({ node }) => {
       setFetchingCategories(false);
     }
   };
+  const autoMatchCategories = () => {
+    if (categories.length === 0) {
+      alert("No categories loaded. Make sure your Guild ID is correct.");
+      return;
+    }
+    if (services.length === 0) {
+      alert("No services to match.");
+      return;
+    }
 
+    // Forgiving normalization: trim + lowercase
+    const normalize = (s) => (s || "").trim().toLowerCase();
+    
+    // For closed: strip trailing ❌ then normalize
+    const normalizeClosed = (s) => normalize((s || "").replace(/❌\s*$/, ""));
+
+    let matchedOpen = 0;
+    let matchedClosed = 0;
+    let unmatched = [];
+
+    const updatedServices = services.map(service => {
+      const serviceNameNorm = normalize(service.name);
+      
+      // Find OPEN category - exact normalized match (no ❌ in category)
+      const openCategory = categories.find(cat => 
+        !cat.title.includes("❌") && normalize(cat.title) === serviceNameNorm
+      );
+      
+      // Find CLOSED category - must end with ❌
+      const closedCategory = categories.find(cat =>
+        cat.title.includes("❌") && normalizeClosed(cat.title) === serviceNameNorm
+      );
+
+      if (openCategory) matchedOpen++;
+      if (closedCategory) matchedClosed++;
+      if (!openCategory && !closedCategory) unmatched.push(service.name);
+
+      return {
+        ...service,
+        open_category: openCategory?.id || service.open_category || "",
+        claimed_category: openCategory?.id || service.claimed_category || "", // Same as open
+        closed_category: closedCategory?.id || service.closed_category || ""
+      };
+    });
+
+    setServices(updatedServices);
+
+    // Show summary
+    let msg = `🪄 Auto-Match Results:\n\n`;
+    msg += `✅ Matched ${matchedOpen}/${services.length} open categories\n`;
+    msg += `✅ Matched ${matchedClosed}/${services.length} closed categories\n`;
+    if (unmatched.length > 0) {
+      msg += `\n⚠️ Could not match these services:\n${unmatched.slice(0, 10).map(n => `• ${n}`).join("\n")}`;
+      if (unmatched.length > 10) msg += `\n...and ${unmatched.length - 10} more`;
+    }
+    msg += `\n\n💡 Click "Save All Settings" to apply changes.`;
+    alert(msg);
+  };
   const saveSettings = async () => {
     if (!revoltGuildId) { setError("Guild ID is required"); return; }
     setSaving(true);
@@ -1131,7 +1188,16 @@ const RevoltSettingsTab = ({ node }) => {
           <span style={{ fontWeight: 700, fontSize: 13 }}>Revolt Server Configuration</span>
           {fetchingCategories && <span style={{ fontSize: 11, color: "#6060a0", marginLeft: "auto" }}>Loading categories...</span>}
           {!fetchingCategories && categories.length > 0 && (
-            <span style={{ fontSize: 11, color: "#34d398", marginLeft: "auto" }}>✓ {categories.length} categories loaded</span>
+            <>
+              <span style={{ fontSize: 11, color: "#34d398", marginLeft: "auto" }}>✓ {categories.length} categories loaded</span>
+              <button
+                onClick={autoMatchCategories}
+                style={{ ...S.btn("#a78bfa"), fontSize: 11, padding: "5px 12px", marginLeft: 8 }}
+                title="Auto-match categories to services by name (forgiving: ignores case + spaces)"
+              >
+                🪄 Auto-Match Categories
+              </button>
+            </>
           )}
         </div>
         <div style={{ padding: "20px" }}>
