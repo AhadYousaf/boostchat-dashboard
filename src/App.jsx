@@ -620,6 +620,7 @@ const TelegramSettingsTab = ({ node }) => {
   const [newQuestion, setNewQuestion] = useState({ question:"", question_type:"text", options:[] });
   const [expandedCmd, setExpandedCmd] = useState(null);
   const [expandedSvc, setExpandedSvc] = useState(null);
+  const [dragSvc, setDragSvc] = useState(null);
   const [expandedQ, setExpandedQ] = useState(null);
   const [dragSvc, setDragSvc] = useState(null);
   const [dragQ, setDragQ] = useState(null);
@@ -816,10 +817,46 @@ const TelegramSettingsTab = ({ node }) => {
         </div>
         <div style={{ padding:"16px 20px" }}>
           {services.map((s, i) => (
-            <div key={s.id||i} style={{ background:"#1a1a28", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 16px", marginBottom:8 }}>
+            <div
+              key={s.id||i}
+              draggable
+              onDragStart={e => { e.dataTransfer.effectAllowed = "move"; setDragSvc(i); }}
+              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+              onDrop={e => {
+                e.preventDefault();
+                if (dragSvc === null || dragSvc === i) return;
+                const newServices = [...services];
+                const [moved] = newServices.splice(dragSvc, 1);
+                newServices.splice(i, 0, moved);
+                setServices(newServices);
+                setDragSvc(null);
+              }}
+              onDragEnd={() => setDragSvc(null)}
+              style={{ background: dragSvc===i ? "#1f1f35" : "#1a1a28", border:`1px solid ${dragSvc===i ? "#34d398" : "#2a2a3e"}`, borderRadius:8, padding:"10px 16px", marginBottom:8, cursor:"grab", opacity: s.is_service_open === false ? 0.5 : 1 }}
+            >
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontSize:13, fontWeight:600 }}>{s.name}</span>
-                <div style={{ display:"flex", gap:6 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, flex:1 }}>
+                  <span style={{ color:"#6060a0", fontSize:14, cursor:"grab" }}>⋮⋮</span>
+                  <span style={{ fontSize:13, fontWeight:600 }}>{s.name}</span>
+                </div>
+                <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                  <button
+                    onClick={() => setServices(services.map((sv,j) => j===i ? {...sv, is_service_open: sv.is_service_open === false ? true : false} : sv))}
+                    style={{
+                      padding:"3px 10px",
+                      borderRadius:6,
+                      border:"1px solid",
+                      borderColor: s.is_service_open === false ? "#e0505044" : "#34d39844",
+                      background: s.is_service_open === false ? "#e0505022" : "#34d39822",
+                      color: s.is_service_open === false ? "#e05050" : "#34d398",
+                      cursor:"pointer",
+                      fontSize:11,
+                      fontWeight:600
+                    }}
+                    title={s.is_service_open === false ? "Click to enable" : "Click to disable"}
+                  >
+                    {s.is_service_open === false ? "🔴 OFF" : "🟢 ON"}
+                  </button>
                   <button onClick={() => setExpandedSvc(expandedSvc===i?null:i)} style={{ ...S.btnOutline, fontSize:11, padding:"3px 10px" }}>
                     {expandedSvc===i?"▲":"···"}
                   </button>
