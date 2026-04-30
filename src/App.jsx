@@ -622,7 +622,6 @@ const TelegramSettingsTab = ({ node }) => {
   const [expandedSvc, setExpandedSvc] = useState(null);
   const [dragSvc, setDragSvc] = useState(null);
   const [expandedQ, setExpandedQ] = useState(null);
-  const [dragSvc, setDragSvc] = useState(null);
   const [dragQ, setDragQ] = useState(null);
 
   const loadSettings = async () => {
