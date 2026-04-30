@@ -146,7 +146,7 @@ const MiniChart = ({ data = [], color = "#6c4fd8", valueKey = "revenue" }) => {
 };
 
 // ─── TOP BAR ─────────────────────────────────────────────────────────────────
-const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode }) => (
+const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelectedNode, showUserMenu, setShowUserMenu }) => (
   <div style={S.topbar}>
     <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={() => { setPage("hub"); setSelectedNode(null); }}>
       <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#7c5af0,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>⚡</div>
@@ -165,11 +165,22 @@ const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelecte
           </div>
         )}
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"4px 12px", cursor:"pointer", fontSize:13 }} onClick={onLogout}>
-        <div style={{ width:24, height:24, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 }}>
-          {user?.username?.[0]?.toUpperCase() || "U"}
+      <div style={{ position:"relative" }}>
+        <div onClick={e => { e.stopPropagation(); setShowUserMenu(v => !v); }}
+          style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"4px 12px", cursor:"pointer", fontSize:13 }}>
+          <div style={{ width:24, height:24, borderRadius:"50%", background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 }}>
+            {user?.username?.[0]?.toUpperCase() || "U"}
+          </div>
+          {user?.username || "User"} ▾
         </div>
-        {user?.username || "User"} ▾
+        {showUserMenu && (
+          <div style={{ position:"absolute", right:0, top:42, ...S.card, zIndex:100, boxShadow:"0 20px 60px #00000090", minWidth:160, overflow:"hidden" }} onClick={e=>e.stopPropagation()}>
+            <button onClick={() => { setShowUserMenu(false); onLogout(); }}
+              style={{ width:"100%", padding:"10px 16px", background:"transparent", border:"none", color:"#f87171", cursor:"pointer", fontSize:13, textAlign:"left", fontWeight:600, display:"flex", alignItems:"center", gap:8 }}>
+              🚪 Logout
+            </button>
+          </div>
+        )}
       </div>
     </div>
   </div>
@@ -183,15 +194,7 @@ const Sidebar = ({ page, setPage, nodes, nodesLoading, selectedNode, setSelected
 
   return (
     <div style={{ width:collapsed?52:220, background:"#13131a", borderRight:"1px solid #1e1e2e", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
-      {!collapsed && (
-        <div style={{ padding:"14px 10px", borderBottom:"1px solid #1e1e2e" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"6px 8px", borderRadius:10, background:"#1e1e2e" }}>
-            <div style={{ width:38, height:38, borderRadius:10, background:"linear-gradient(135deg,#6c4fd8,#4a90e2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, fontWeight:800, flexShrink:0 }}>S</div>
-            <div><div style={{ fontWeight:700, fontSize:14 }}>Samchip</div><div style={{ fontSize:11, color:"#6060a0" }}>Business</div></div>
-            <div style={{ marginLeft:"auto", color:"#6060a0" }}>›</div>
-          </div>
-        </div>
-      )}
+      
       <div style={{ padding:"8px 6px", flex:1, overflowY:"auto" }}>
         {!collapsed && <div style={{ fontSize:10, color:"#3a3a5a", padding:"4px 8px 4px", textTransform:"uppercase", letterSpacing:1.2 }}>Navigation</div>}
         {[{id:"hub",label:"Hub",icon:"⊞"},{id:"bots",label:"Bots",icon:"🤖"},{id:"nodes",label:"Nodes",icon:"⬡"}].map(item => (
@@ -284,9 +287,10 @@ const HubPage = ({ user, nodes, setPage, setSelectedNode }) => {
     const load = async () => {
       if (!nodes.length) return;
       let totalRevenue=0, totalTickets=0, activeUsers=0;
+      const today = new Date().toISOString().split('T')[0];
       for (const node of nodes) {
         try {
-          const data = await api(`/analytics/${node.id}?period=1`);
+          const data = await api(`/analytics/${node.id}?start=${today}&end=${today}`);
           totalRevenue += parseFloat(data.overview?.total_revenue||0);
           totalTickets += parseInt(data.overview?.paid_tickets||0);
           activeUsers += parseInt(data.overview?.unique_customers||0);
@@ -3303,6 +3307,7 @@ export default function App() {
   const [nodesLoading, setNodesLoading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -3367,7 +3372,7 @@ export default function App() {
   };
 
   return (
-    <div style={S.root} onClick={() => showNotifs && setShowNotifs(false)}>
+    <div style={S.root} onClick={() => { showNotifs && setShowNotifs(false); showUserMenu && setShowUserMenu(false); }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing:border-box; margin:0; padding:0; }
@@ -3380,7 +3385,7 @@ export default function App() {
         button { font-family:inherit; }
         @keyframes spin { to { transform:rotate(360deg); } }
       `}</style>
-      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs} setPage={setPage} setSelectedNode={setSelectedNode}/>
+      <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs} setPage={setPage} setSelectedNode={setSelectedNode} showUserMenu={showUserMenu} setShowUserMenu={setShowUserMenu}/>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <Sidebar page={page} setPage={setPage} nodes={nodes} nodesLoading={nodesLoading} selectedNode={selectedNode} setSelectedNode={setSelectedNode} collapsed={collapsed} setCollapsed={setCollapsed}/>
         <div style={{ flex:1, overflowY:fullHeight?"hidden":"auto", padding:fullHeight?0:"28px 32px", background:"#0d0d12", display:fullHeight?"flex":"block", flexDirection:fullHeight?"column":undefined }}>
