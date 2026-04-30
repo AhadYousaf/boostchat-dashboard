@@ -1431,6 +1431,7 @@ const RevoltSettingsTab = ({ node }) => {
 };
 
 // ─── ACCOUNTING TAB ──────────────────────────────────────────────────────────
+// ─── ACCOUNTING TAB ──────────────────────────────────────────────────────────
 const AccountingTab = ({ node }) => {
   const [contractors, setContractors] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1472,18 +1473,18 @@ const AccountingTab = ({ node }) => {
     } catch (err) { alert(err.message); }
   };
 
-  const removeContractor = async (revoltId) => {
-    if (!confirm("Remove this contractor?")) return;
+  const removeContractor = async (userId) => {
+    if (!confirm("Remove this contractor? Their analytics history will be preserved.")) return;
     try {
-      await api(`/nodes/${node.id}/contractors/${revoltId}`, { method:"DELETE" });
+      await api(`/nodes/${node.id}/contractors/${userId}`, { method:"DELETE" });
       loadContractors(); loadMembers();
     } catch (err) { alert(err.message); }
   };
 
-  const updateCut = async (revoltId, cut) => {
+  const updateCut = async (userId, cut) => {
     try {
-      await api(`/nodes/${node.id}/contractors/${revoltId}`, { method:"PUT", body:{ cut_percentage:parseFloat(cut) } });
-      setEditingCut(p => { const n={...p}; delete n[revoltId]; return n; });
+      await api(`/nodes/${node.id}/contractors/${userId}`, { method:"PUT", body:{ cut_percentage:parseFloat(cut) } });
+      setEditingCut(p => { const n={...p}; delete n[userId]; return n; });
       loadContractors();
     } catch (err) { alert(err.message); }
   };
@@ -1516,20 +1517,20 @@ const AccountingTab = ({ node }) => {
                 <div style={{ fontSize:13, fontWeight:700 }}>{w.username}</div>
                 <div style={{ fontSize:11, color:"#6060a0" }}>Revolt worker</div>
               </div>
-              {editingCut[w.revolt_id] !== undefined ? (
+              {editingCut[w.id] !== undefined ? (
                 <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <input type="number" value={editingCut[w.revolt_id]}
-                    onChange={e => setEditingCut(p => ({...p, [w.revolt_id]:e.target.value}))}
+                  <input type="number" value={editingCut[w.id]}
+                    onChange={e => setEditingCut(p => ({...p, [w.id]:e.target.value}))}
                     style={{ ...S.input, width:60, padding:"4px 8px", fontSize:12 }}/>
                   <span style={{ fontSize:12, color:"#6060a0" }}>%</span>
-                  <button onClick={() => updateCut(w.revolt_id, editingCut[w.revolt_id])} style={{ ...S.btn("#34d398"), fontSize:11, padding:"4px 10px" }}>✓</button>
-                  <button onClick={() => setEditingCut(p => { const n={...p}; delete n[w.revolt_id]; return n; })} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>✕</button>
+                  <button onClick={() => updateCut(w.id, editingCut[w.id])} style={{ ...S.btn("#34d398"), fontSize:11, padding:"4px 10px" }}>✓</button>
+                  <button onClick={() => setEditingCut(p => { const n={...p}; delete n[w.id]; return n; })} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>✕</button>
                 </div>
               ) : (
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <span style={{ background:"#34d39822", color:"#34d398", border:"1px solid #34d39844", borderRadius:6, padding:"2px 10px", fontSize:12, fontWeight:700 }}>{w.cut_percentage}%</span>
-                  <button onClick={() => setEditingCut(p => ({...p, [w.revolt_id]:String(w.cut_percentage)}))} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>Edit</button>
-                  <button onClick={() => removeContractor(w.revolt_id)} style={{ ...S.btn("#e05050"), fontSize:11, padding:"4px 10px" }}>Remove</button>
+                  <button onClick={() => setEditingCut(p => ({...p, [w.id]:String(w.cut_percentage)}))} style={{ ...S.btnOutline, fontSize:11, padding:"4px 10px" }}>Edit</button>
+                  <button onClick={() => removeContractor(w.id)} style={{ ...S.btn("#e05050"), fontSize:11, padding:"4px 10px" }}>Remove</button>
                 </div>
               )}
             </div>
