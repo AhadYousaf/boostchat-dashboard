@@ -1255,6 +1255,20 @@ const RevoltSettingsTab = ({ node }) => {
               >
                 🪄 Auto-Match Categories
               </button>
+              <button
+                onClick={async () => {
+                  if (!confirm("This will create Revolt roles + categories for all services. Existing matches will be linked. Proceed?")) return;
+                  try {
+                    const data = await api(`/nodes/${node.id}/setup-roles`, { method: "POST" });
+                    alert(`✅ Setup complete!\n\nRoles created: ${data.roles_created}\nRoles linked: ${data.roles_linked}\n\nOpen categories created: ${data.open_categories_created}\nOpen categories linked: ${data.open_categories_linked}\n\nClosed categories created: ${data.closed_categories_created}\nClosed categories linked: ${data.closed_categories_linked}\n\nFailed: ${data.failed}\nTotal services: ${data.total_services}`);
+                    loadSettings();
+                  } catch (err) { alert("Error: " + err.message); }
+                }}
+                style={{ ...S.btn("#34d398"), fontSize: 11, padding: "5px 12px", marginLeft: 8 }}
+                title="Auto-create Revolt roles + categories for all services"
+              >
+                🛡️ Setup Roles + Categories
+              </button>
             </>
           )}
         </div>
