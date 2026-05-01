@@ -1255,19 +1255,6 @@ const RevoltSettingsTab = ({ node }) => {
               >
                 🪄 Auto-Match Categories
               </button>
-              <button
-                onClick={async () => {
-                  if (!confirm("This will create Revolt roles for each service (named without emojis). Existing roles with matching names will be linked. Proceed?")) return;
-                  try {
-                    const data = await api(`/nodes/${node.id}/setup-roles`, { method: "POST" });
-                    alert(`✅ Roles setup complete!\n\nCreated: ${data.created}\nLinked existing: ${data.linked_existing}\nSkipped: ${data.skipped}\nFailed: ${data.failed}\nTotal services: ${data.total_services}`);
-                  } catch (err) { alert("Error: " + err.message); }
-                }}
-                style={{ ...S.btn("#34d398"), fontSize: 11, padding: "5px 12px", marginLeft: 8 }}
-                title="Auto-create Revolt roles for each service"
-              >
-                🛡️ Setup Roles
-              </button>
             </>
           )}
         </div>
