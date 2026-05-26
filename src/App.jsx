@@ -3419,15 +3419,134 @@ const JoinPage = ({ token }) => {
     </div>
   );
 };
+// ─── SUPERADMIN PAGE ──────────────────────────────────────────────────────────
+function SuperadminPage() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [editingCut, setEditingCut] = useState(null);
+  const [cutValue, setCutValue] = useState("");
 
+  const load = async () => {
+    setLoading(true);
+    try {
+      const params = [];
+      if (start) params.push(`start=${start}`);
+      if (end) params.push(`end=${end}`);
+      const qs = params.length ? "?" + params.join("&") : "";
+      const d = await api(`/admin/overview${qs}`);
+      setData(d);
+    } catch (e) {
+      alert("Failed to load: " + e.message);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const saveCut = async (nodeId) => {
+    try {
+      await api(`/admin/nodes/${nodeId}/cut`, { method: "PATCH", body: { cut_percent: parseFloat(cutValue) } });
+      setEditingCut(null);
+      load();
+    } catch (e) { alert("Failed: " + e.message); }
+  };
+
+  if (loading) return <div style={{ padding: 24, color: "#9090c0" }}>Loading...</div>;
+  if (!data) return <div style={{ padding: 24, color: "#9090c0" }}>No data</div>;
+
+  return (
+    <div style={{ padding: 24, maxWidth: 1300, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 24, marginBottom: 24 }}>👑 Superadmin Overview</h1>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
+        <div style={{ ...S.card, padding: 16 }}>
+          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>CUSTOMERS</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.total_customers}</div>
+        </div>
+        <div style={{ ...S.card, padding: 16 }}>
+          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>TICKETS (PERIOD)</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.totals.tickets_period}</div>
+        </div>
+        <div style={{ ...S.card, padding: 16 }}>
+          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>REVENUE (PERIOD)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#22c55e" }}>${parseFloat(data.totals.revenue_period).toFixed(2)}</div>
+        </div>
+        <div style={{ ...S.card, padding: 16 }}>
+          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>YOUR CUT (PERIOD)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#fbbf24" }}>${parseFloat(data.totals.your_cut_period).toFixed(2)}</div>
+        </div>
+        <div style={{ ...S.card, padding: 16 }}>
+          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>YOUR CUT (ALL TIME)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#a78bfa" }}>${parseFloat(data.totals.your_cut_total).toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#9090c0" }}>From:</span>
+        <input type="date" value={start} onChange={e => setStart(e.target.value)} style={S.input}/>
+        <span style={{ fontSize: 12, color: "#9090c0" }}>To:</span>
+        <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={S.input}/>
+        <button onClick={load} style={S.btn("#a78bfa")}>Apply</button>
+      </div>
+
+      <div style={S.card}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid #2a2a3e" }}>
+              <th style={{ textAlign: "left", padding: 12, fontSize: 11, color: "#6060a0" }}>CUSTOMER</th>
+              <th style={{ textAlign: "left", padding: 12, fontSize: 11, color: "#6060a0" }}>OWNER</th>
+              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>TICKETS</th>
+              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>REVENUE</th>
+              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>MY CUT %</th>
+              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>MY CUT $</th>
+              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>ALL TIME REV</th>
+              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>LAST</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.nodes.map(n => (
+              <tr key={n.id} style={{ borderBottom: "1px solid #1a1a2e" }}>
+                <td style={{ padding: 12, fontWeight: 600 }}>{n.name}</td>
+                <td style={{ padding: 12, color: "#9090c0", fontSize: 13 }}>{n.owner_username || "—"}</td>
+                <td style={{ padding: 12, textAlign: "right" }}>{n.tickets_period}</td>
+                <td style={{ padding: 12, textAlign: "right", color: "#22c55e", fontWeight: 600 }}>${parseFloat(n.revenue_period).toFixed(2)}</td>
+                <td style={{ padding: 12, textAlign: "right" }}>
+                  {editingCut === n.id ? (
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <input type="number" value={cutValue} onChange={e => setCutValue(e.target.value)} style={{ ...S.input, width: 60, padding: "4px 6px" }}/>
+                      <button onClick={() => saveCut(n.id)} style={{ ...S.btn("#22c55e"), padding: "4px 8px", fontSize: 11 }}>✓</button>
+                      <button onClick={() => setEditingCut(null)} style={{ ...S.btn("#666"), padding: "4px 8px", fontSize: 11 }}>✕</button>
+                    </div>
+                  ) : (
+                    <span style={{ cursor: "pointer", color: "#a78bfa" }} onClick={() => { setEditingCut(n.id); setCutValue(n.owner_cut_percent || 10); }}>
+                      {parseFloat(n.owner_cut_percent || 0).toFixed(0)}%
+                    </span>
+                  )}
+                </td>
+                <td style={{ padding: 12, textAlign: "right", color: "#fbbf24", fontWeight: 600 }}>${parseFloat(n.your_cut_period).toFixed(2)}</td>
+                <td style={{ padding: 12, textAlign: "right", color: "#a78bfa" }}>${parseFloat(n.revenue_total).toFixed(2)}</td>
+                <td style={{ padding: 12, textAlign: "right", color: "#6060a0", fontSize: 12 }}>
+                  {n.last_ticket_at ? new Date(n.last_ticket_at).toLocaleDateString() : "Never"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const getInitialPage = () => {
     const hash = window.location.hash.replace('#', '');
     if (hash.startsWith('node-detail:')) return 'node-detail';
-    const validPages = ['hub','bots','nodes','node-detail','customers','tickets','analytics','settings','reports','logs','notifications'];
+    const validPages = ['hub','bots','nodes','node-detail','customers','tickets','analytics','settings','reports','logs','notifications','superadmin'];
     return validPages.includes(hash) ? hash : 'hub';
   };
   const getInitialNodeId = () => {
@@ -3470,6 +3589,11 @@ export default function App() {
     };
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    api("/admin/check").then(d => setIsSuperadmin(!!d.is_superadmin)).catch(() => {});
+  }, [user]);
 
   const loadNodes = useCallback(async () => {
     if (!user) return;
@@ -3518,6 +3642,7 @@ export default function App() {
       case "settings": return <SettingsPage user={user} onUpdate={(u) => setUser(u)}/>;
       case "reports": return <div style={{ padding:"32px" }}><h1 style={{ fontSize:24, fontWeight:800, marginBottom:16 }}>Reports</h1><div style={{ ...S.card, padding:"48px", textAlign:"center", color:"#4040a0" }}>Report generation coming soon.</div></div>;
       case "logs": return <div style={{ padding:"32px" }}><h1 style={{ fontSize:24, fontWeight:800, marginBottom:16 }}>Logs</h1><div style={{ ...S.card, padding:"48px", textAlign:"center", color:"#4040a0" }}>System logs coming soon.</div></div>;
+      case "superadmin": return isSuperadmin ? <SuperadminPage/> : <div style={{ padding:"32px", color:"#9090c0" }}>Access denied.</div>;
       default: return <HubPage user={user} nodes={nodes} setPage={setPage} setSelectedNode={setSelectedNode}/>;
     }
   };
