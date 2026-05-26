@@ -187,7 +187,7 @@ const TopBar = ({ user, onLogout, showNotifs, setShowNotifs, setPage, setSelecte
 );
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
-const Sidebar = ({ page, setPage, nodes, nodesLoading, selectedNode, setSelectedNode, collapsed, setCollapsed }) => {
+const Sidebar = ({ page, setPage, nodes, nodesLoading, selectedNode, setSelectedNode, collapsed, setCollapsed, isSuperadmin }) => {
   const profilePages = ["settings","notifications"];
   const isProfilePage = profilePages.includes(page);
   const [profileOpen, setProfileOpen] = useState(isProfilePage);
@@ -197,7 +197,7 @@ const Sidebar = ({ page, setPage, nodes, nodesLoading, selectedNode, setSelected
       
       <div style={{ padding:"8px 6px", flex:1, overflowY:"auto" }}>
         {!collapsed && <div style={{ fontSize:10, color:"#3a3a5a", padding:"4px 8px 4px", textTransform:"uppercase", letterSpacing:1.2 }}>Navigation</div>}
-        {[{id:"hub",label:"Hub",icon:"⊞"},{id:"bots",label:"Bots",icon:"🤖"},{id:"nodes",label:"Nodes",icon:"⬡"}].map(item => (
+        {[{id:"hub",label:"Hub",icon:"⊞"},{id:"bots",label:"Bots",icon:"🤖"},{id:"nodes",label:"Nodes",icon:"⬡"},...(isSuperadmin?[{id:"superadmin",label:"Superadmin",icon:"👑"}]:[])].map(item => (
           <button key={item.id} onClick={() => { setPage(item.id); setSelectedNode(null); }}
             style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:8, border:"none",
               background:page===item.id?"#6c4fd822":"transparent", color:page===item.id?"#a78bfa":"#c0c0e0",
@@ -3797,7 +3797,7 @@ export default function App() {
       `}</style>
       <TopBar user={user} onLogout={handleLogout} showNotifs={showNotifs} setShowNotifs={setShowNotifs} setPage={setPage} setSelectedNode={setSelectedNode} showUserMenu={showUserMenu} setShowUserMenu={setShowUserMenu}/>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
-        <Sidebar page={page} setPage={setPage} nodes={nodes} nodesLoading={nodesLoading} selectedNode={selectedNode} setSelectedNode={setSelectedNode} collapsed={collapsed} setCollapsed={setCollapsed}/>
+        <Sidebar page={page} setPage={setPage} nodes={nodes} nodesLoading={nodesLoading} selectedNode={selectedNode} setSelectedNode={setSelectedNode} collapsed={collapsed} setCollapsed={setCollapsed} isSuperadmin={isSuperadmin}/>
         <div style={{ flex:1, overflowY:fullHeight?"hidden":"auto", padding:fullHeight?0:"28px 32px", background:"#0d0d12", display:fullHeight?"flex":"block", flexDirection:fullHeight?"column":undefined }}>
           {renderPage()}
         </div>
