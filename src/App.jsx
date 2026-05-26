@@ -3421,119 +3421,253 @@ const JoinPage = ({ token }) => {
 };
 // ─── SUPERADMIN PAGE ──────────────────────────────────────────────────────────
 function SuperadminPage() {
+  const LAUNCH_DATE = new Date("2026-05-27");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
+  const [startDate, setStartDate] = useState(LAUNCH_DATE);
+  const [endDate, setEndDate] = useState(new Date());
   const [editingCut, setEditingCut] = useState(null);
   const [cutValue, setCutValue] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("your_cut_period");
+  const [sortDir, setSortDir] = useState("desc");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = [];
-      if (start) params.push(`start=${start}`);
-      if (end) params.push(`end=${end}`);
-      const qs = params.length ? "?" + params.join("&") : "";
-      const d = await api(`/admin/overview${qs}`);
+      const s = startDate.toISOString().split('T')[0];
+      const e = endDate.toISOString().split('T')[0];
+      const d = await api(`/admin/overview?start=${s}&end=${e}`);
       setData(d);
-    } catch (e) {
-      alert("Failed to load: " + e.message);
-    }
+    } catch (err) { alert("Failed: " + err.message); }
     setLoading(false);
-  };
+  }, [startDate, endDate]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const saveCut = async (nodeId) => {
     try {
-      await api(`/admin/nodes/${nodeId}/cut`, { method: "PATCH", body: { cut_percent: parseFloat(cutValue) } });
+      await api(`/admin/nodes/${nodeId}/cut`, { method:"PATCH", body:{ cut_percent: parseFloat(cutValue) }});
       setEditingCut(null);
       load();
-    } catch (e) { alert("Failed: " + e.message); }
+    } catch (err) { alert("Failed: " + err.message); }
   };
 
-  if (loading) return <div style={{ padding: 24, color: "#9090c0" }}>Loading...</div>;
-  if (!data) return <div style={{ padding: 24, color: "#9090c0" }}>No data</div>;
+  const getHealth = (n) => {
+    if (!n.last_ticket_at) return { label:"Inactive", color:"#6060a0", emoji:"💤" };
+    const d = (Date.now() - new Date(n.last_ticket_at)) / 86400000;
+    if (d < 1) return { label:"Active today", color:"#34d398", emoji:"🟢" };
+    if (d < 7) return { label:"Active", color:"#34d398", emoji:"🟢" };
+    if (d < 30) return { label:"Idle", color:"#f59e0b", emoji:"🟡" };
+    return { label:"Dormant", color:"#e05050", emoji:"🔴" };
+  };
+
+  const exportCSV = () => {
+    if (!data?.nodes?.length) return;
+    const headers = ["Customer","Owner","Status","Tickets","Revenue","Cut %","My Cut","All-Time Rev","Last Activity"];
+    const rows = data.nodes.map(n => {
+      const h = getHealth(n);
+      return [n.name, n.owner_username||"", h.label, n.tickets_period,
+        parseFloat(n.revenue_period||0).toFixed(2), n.owner_cut_percent||0,
+        parseFloat(n.your_cut_period||0).toFixed(2), parseFloat(n.revenue_total||0).toFixed(2),
+        n.last_ticket_at ? new Date(n.last_ticket_at).toLocaleDateString() : "Never"];
+    });
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" }));
+    a.download = `boostchat-customers-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  const daysSinceLaunch = Math.floor((Date.now() - LAUNCH_DATE) / 86400000);
+
+  const filtered = (data?.nodes || []).filter(n => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!n.name.toLowerCase().includes(q) && !(n.owner_username||"").toLowerCase().includes(q)) return false;
+    }
+    if (statusFilter !== "all") {
+      const h = getHealth(n);
+      if (statusFilter === "active" && !h.label.includes("Active")) return false;
+      if (statusFilter === "idle" && h.label !== "Idle") return false;
+      if (statusFilter === "dormant" && h.label !== "Dormant") return false;
+      if (statusFilter === "inactive" && h.label !== "Inactive") return false;
+    }
+    return true;
+  }).sort((a,b) => {
+    let av = a[sortBy], bv = b[sortBy];
+    if (sortBy === "last_ticket_at") {
+      av = av ? new Date(av).getTime() : 0;
+      bv = bv ? new Date(bv).getTime() : 0;
+    } else if (typeof av === "string" && typeof bv === "string") {
+      return sortDir === "asc" ? (av||"").localeCompare(bv||"") : (bv||"").localeCompare(av||"");
+    }
+    av = parseFloat(av) || 0; bv = parseFloat(bv) || 0;
+    return sortDir === "asc" ? av - bv : bv - av;
+  });
+
+  const setSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortBy(col); setSortDir("desc"); }
+  };
+
+  const SortH = ({ col, label, align="left" }) => (
+    <th onClick={() => setSort(col)} style={{ textAlign:align, padding:12, fontSize:10, color:sortBy===col?"#a78bfa":"#6060a0", fontWeight:700, cursor:"pointer", userSelect:"none", letterSpacing:0.8, textTransform:"uppercase" }}>
+      {label} {sortBy===col ? (sortDir==="asc"?"↑":"↓") : ""}
+    </th>
+  );
+
+  const presets = [
+    { label:"Today", start:new Date(new Date().setHours(0,0,0,0)), end:new Date() },
+    { label:"Last 7d", start:new Date(Date.now() - 7*86400000), end:new Date() },
+    { label:"Last 30d", start:new Date(Date.now() - 30*86400000), end:new Date() },
+    { label:"Since launch", start:LAUNCH_DATE, end:new Date() },
+  ];
+
+  if (loading && !data) return <div style={{ padding:60, display:"flex", justifyContent:"center" }}><Spinner size={32}/></div>;
+  if (!data) return <div style={{ padding:24, color:"#9090c0" }}>No data</div>;
+
+  const stats = [
+    { label:"Customers", value:data.total_customers, color:"#a78bfa", icon:"👥" },
+    { label:"Tickets", value:data.totals.tickets_period, color:"#60a5fa", icon:"🎫" },
+    { label:"Revenue", value:`$${parseFloat(data.totals.revenue_period).toFixed(2)}`, color:"#22c55e", icon:"💰" },
+    { label:"My Cut", value:`$${parseFloat(data.totals.your_cut_period).toFixed(2)}`, color:"#fbbf24", icon:"✨" },
+    { label:"All-Time Cut", value:`$${parseFloat(data.totals.your_cut_total).toFixed(2)}`, color:"#e879f9", icon:"🏆" },
+  ];
 
   return (
-    <div style={{ padding: 24, maxWidth: 1300, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 24 }}>👑 Superadmin Overview</h1>
+    <div style={{ padding:24, maxWidth:1400, margin:"0 auto" }}>
+      <style>{`.admin-row:hover{background:#1a1a2e!important} .preset-btn:hover{background:#2a2a3e!important;color:#a78bfa!important}`}</style>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
-        <div style={{ ...S.card, padding: 16 }}>
-          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>CUSTOMERS</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.total_customers}</div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+        <h1 style={{ fontSize:24, fontWeight:800 }}>👑 Superadmin</h1>
+        <div style={{ fontSize:11, color:"#6060a0", background:"#16161f", border:"1px solid #2a2a3e", borderRadius:6, padding:"4px 10px" }}>
+          🚀 Day {daysSinceLaunch >= 0 ? daysSinceLaunch + 1 : 0} since launch
         </div>
-        <div style={{ ...S.card, padding: 16 }}>
-          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>TICKETS (PERIOD)</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.totals.tickets_period}</div>
-        </div>
-        <div style={{ ...S.card, padding: 16 }}>
-          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>REVENUE (PERIOD)</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#22c55e" }}>${parseFloat(data.totals.revenue_period).toFixed(2)}</div>
-        </div>
-        <div style={{ ...S.card, padding: 16 }}>
-          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>YOUR CUT (PERIOD)</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#fbbf24" }}>${parseFloat(data.totals.your_cut_period).toFixed(2)}</div>
-        </div>
-        <div style={{ ...S.card, padding: 16 }}>
-          <div style={{ fontSize: 11, color: "#6060a0", marginBottom: 6 }}>YOUR CUT (ALL TIME)</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#a78bfa" }}>${parseFloat(data.totals.your_cut_total).toFixed(2)}</div>
+      </div>
+      <p style={{ color:"#6060a0", fontSize:13, marginBottom:20 }}>Birds-eye view of every customer and your cut.</p>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:12, marginBottom:18 }}>
+        {stats.map((s,i) => (
+          <div key={i} style={{ ...S.card, padding:"16px 18px", background:`linear-gradient(135deg, ${s.color}0d, #16161f 70%)`, border:`1px solid ${s.color}22`, position:"relative", overflow:"hidden" }}>
+            <div style={{ position:"absolute", right:14, top:14, fontSize:22, opacity:0.18 }}>{s.icon}</div>
+            <div style={{ fontSize:10, color:s.color+"aa", fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", marginBottom:8 }}>{s.label}</div>
+            <div style={{ fontSize:22, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, padding:14, marginBottom:14, display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+        <span style={{ fontSize:12, color:"#6060a0", fontWeight:700 }}>📅 Period:</span>
+        {presets.map(p => (
+          <button key={p.label} className="preset-btn" onClick={() => { setStartDate(p.start); setEndDate(p.end); }}
+            style={{ background:"#1e1e2e", border:"1px solid #2a2a3e", borderRadius:8, padding:"5px 12px", color:"#8080a0", cursor:"pointer", fontSize:11, fontWeight:600, transition:"all 0.15s" }}>
+            {p.label}
+          </button>
+        ))}
+        <div style={{ width:1, height:20, background:"#2a2a3e" }}/>
+        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s,e) => { setStartDate(s); setEndDate(e); }}/>
+        <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+          <button onClick={load} style={{ ...S.btnOutline, fontSize:11, padding:"5px 12px" }}>↻ Refresh</button>
+          <button onClick={exportCSV} style={{ ...S.btn("#34d398"), fontSize:11, padding:"5px 12px" }}>⬇ CSV</button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: "#9090c0" }}>From:</span>
-        <input type="date" value={start} onChange={e => setStart(e.target.value)} style={S.input}/>
-        <span style={{ fontSize: 12, color: "#9090c0" }}>To:</span>
-        <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={S.input}/>
-        <button onClick={load} style={S.btn("#a78bfa")}>Apply</button>
+      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:12, flexWrap:"wrap" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search customers or owners..."
+          style={{ ...S.input, maxWidth:280, fontSize:12, padding:"6px 12px" }}/>
+        <div style={{ display:"flex", gap:4 }}>
+          {[["all","All"],["active","🟢 Active"],["idle","🟡 Idle"],["dormant","🔴 Dormant"],["inactive","💤 Inactive"]].map(([s,label]) => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              style={{ padding:"5px 10px", borderRadius:6, border:"1px solid #2a2a3e",
+                background:statusFilter===s?"#6c4fd822":"transparent",
+                color:statusFilter===s?"#a78bfa":"#8080a0", cursor:"pointer", fontSize:11, fontWeight:600 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span style={{ marginLeft:"auto", fontSize:11, color:"#6060a0" }}>{filtered.length} of {data.nodes.length}</span>
       </div>
 
-      <div style={S.card}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #2a2a3e" }}>
-              <th style={{ textAlign: "left", padding: 12, fontSize: 11, color: "#6060a0" }}>CUSTOMER</th>
-              <th style={{ textAlign: "left", padding: 12, fontSize: 11, color: "#6060a0" }}>OWNER</th>
-              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>TICKETS</th>
-              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>REVENUE</th>
-              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>MY CUT %</th>
-              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>MY CUT $</th>
-              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>ALL TIME REV</th>
-              <th style={{ textAlign: "right", padding: 12, fontSize: 11, color: "#6060a0" }}>LAST</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.nodes.map(n => (
-              <tr key={n.id} style={{ borderBottom: "1px solid #1a1a2e" }}>
-                <td style={{ padding: 12, fontWeight: 600 }}>{n.name}</td>
-                <td style={{ padding: 12, color: "#9090c0", fontSize: 13 }}>{n.owner_username || "—"}</td>
-                <td style={{ padding: 12, textAlign: "right" }}>{n.tickets_period}</td>
-                <td style={{ padding: 12, textAlign: "right", color: "#22c55e", fontWeight: 600 }}>${parseFloat(n.revenue_period).toFixed(2)}</td>
-                <td style={{ padding: 12, textAlign: "right" }}>
-                  {editingCut === n.id ? (
-                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                      <input type="number" value={cutValue} onChange={e => setCutValue(e.target.value)} style={{ ...S.input, width: 60, padding: "4px 6px" }}/>
-                      <button onClick={() => saveCut(n.id)} style={{ ...S.btn("#22c55e"), padding: "4px 8px", fontSize: 11 }}>✓</button>
-                      <button onClick={() => setEditingCut(null)} style={{ ...S.btn("#666"), padding: "4px 8px", fontSize: 11 }}>✕</button>
-                    </div>
-                  ) : (
-                    <span style={{ cursor: "pointer", color: "#a78bfa" }} onClick={() => { setEditingCut(n.id); setCutValue(n.owner_cut_percent || 10); }}>
-                      {parseFloat(n.owner_cut_percent || 0).toFixed(0)}%
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: 12, textAlign: "right", color: "#fbbf24", fontWeight: 600 }}>${parseFloat(n.your_cut_period).toFixed(2)}</td>
-                <td style={{ padding: 12, textAlign: "right", color: "#a78bfa" }}>${parseFloat(n.revenue_total).toFixed(2)}</td>
-                <td style={{ padding: 12, textAlign: "right", color: "#6060a0", fontSize: 12 }}>
-                  {n.last_ticket_at ? new Date(n.last_ticket_at).toLocaleDateString() : "Never"}
-                </td>
+      <div style={{ ...S.card, overflow:"hidden" }}>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ borderBottom:"1px solid #2a2a3e", background:"#0f0f18" }}>
+                <SortH col="name" label="Customer"/>
+                <SortH col="owner_username" label="Owner"/>
+                <th style={{ textAlign:"left", padding:12, fontSize:10, color:"#6060a0", fontWeight:700, letterSpacing:0.8, textTransform:"uppercase" }}>Status</th>
+                <SortH col="tickets_period" label="Tickets" align="right"/>
+                <SortH col="revenue_period" label="Revenue" align="right"/>
+                <SortH col="owner_cut_percent" label="Cut %" align="right"/>
+                <SortH col="your_cut_period" label="My Cut" align="right"/>
+                <SortH col="revenue_total" label="All-Time" align="right"/>
+                <SortH col="last_ticket_at" label="Last Activity" align="right"/>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={9} style={{ padding:48, textAlign:"center", color:"#6060a0" }}>No customers match your filters</td></tr>
+              ) : filtered.map((n,i) => {
+                const h = getHealth(n);
+                const daysSince = n.last_ticket_at ? Math.floor((Date.now() - new Date(n.last_ticket_at)) / 86400000) : null;
+                const medal = i < 3 && sortBy === "your_cut_period" && sortDir === "desc" ? ["🥇","🥈","🥉"][i] : null;
+                return (
+                  <tr key={n.id} className="admin-row" style={{ borderBottom:"1px solid #1a1a2e", transition:"background 0.15s" }}>
+                    <td style={{ padding:12, fontWeight:600 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        {medal && <span style={{ fontSize:14 }}>{medal}</span>}
+                        <span>{n.name}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding:12, color:"#9090c0", fontSize:12 }}>{n.owner_username || "—"}</td>
+                    <td style={{ padding:12 }}>
+                      <span style={{ background:h.color+"22", color:h.color, border:`1px solid ${h.color}44`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700, whiteSpace:"nowrap" }}>
+                        {h.emoji} {h.label}
+                      </span>
+                    </td>
+                    <td style={{ padding:12, textAlign:"right", color:"#60a5fa" }}>{n.tickets_period}</td>
+                    <td style={{ padding:12, textAlign:"right", color:"#22c55e", fontWeight:600 }}>${parseFloat(n.revenue_period||0).toFixed(2)}</td>
+                    <td style={{ padding:12, textAlign:"right" }}>
+                      {editingCut === n.id ? (
+                        <div style={{ display:"flex", gap:4, justifyContent:"flex-end" }}>
+                          <input type="number" autoFocus value={cutValue} onChange={e => setCutValue(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && saveCut(n.id)}
+                            style={{ ...S.input, width:60, padding:"4px 6px" }}/>
+                          <button onClick={() => saveCut(n.id)} style={{ ...S.btn("#22c55e"), padding:"4px 8px", fontSize:11 }}>✓</button>
+                          <button onClick={() => setEditingCut(null)} style={{ ...S.btnOutline, padding:"4px 8px", fontSize:11 }}>✕</button>
+                        </div>
+                      ) : (
+                        <span onClick={() => { setEditingCut(n.id); setCutValue(n.owner_cut_percent || 10); }}
+                          style={{ cursor:"pointer", color:"#a78bfa", padding:"2px 8px", borderRadius:4, background:"#a78bfa15", fontWeight:600 }}>
+                          {parseFloat(n.owner_cut_percent || 0).toFixed(0)}% ✎
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding:12, textAlign:"right", color:"#fbbf24", fontWeight:700 }}>${parseFloat(n.your_cut_period||0).toFixed(2)}</td>
+                    <td style={{ padding:12, textAlign:"right", color:"#e879f9" }}>${parseFloat(n.revenue_total||0).toFixed(2)}</td>
+                    <td style={{ padding:12, textAlign:"right", color:"#6060a0", fontSize:11 }}>
+                      {n.last_ticket_at ? (
+                        <div>
+                          <div>{new Date(n.last_ticket_at).toLocaleDateString()}</div>
+                          <div style={{ fontSize:10, color: daysSince > 30 ? "#e05050" : daysSince > 7 ? "#f59e0b" : "#34d398" }}>
+                            {daysSince === 0 ? "today" : daysSince === 1 ? "1d ago" : `${daysSince}d ago`}
+                          </div>
+                        </div>
+                      ) : "Never"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ marginTop:14, padding:12, ...S.card, display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11, color:"#6060a0" }}>
+        <span>📊 Showing {filtered.length} of {data.nodes.length} customers</span>
+        <span>📅 {startDate.toLocaleDateString()} → {endDate.toLocaleDateString()}</span>
       </div>
     </div>
   );
