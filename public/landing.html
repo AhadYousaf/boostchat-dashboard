@@ -207,6 +207,13 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
 .reveal.visible{opacity:1;transform:translateY(0)}
 .mock-tab{cursor:pointer;transition:all 0.15s}
 .mock-panel{display:flex;flex-direction:column;gap:14px}
+
+/* ── REDUCED MOTION ── */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+  .reveal{opacity:1;transform:none}
+  .marquee-track{animation:none}
+}
 </style>
 </head>
 <body>
@@ -262,11 +269,11 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
           <div class="sidebar-item"><div class="sidebar-dot"></div> Bots</div>
           <div class="sidebar-item"><div class="sidebar-dot"></div> Nodes</div>
           <div class="sidebar-section">Your Node</div>
-          <div class="sidebar-item mock-tab" data-tab="settings"><div class="sidebar-dot"></div> Settings</div>
-          <div class="sidebar-item mock-tab" data-tab="customers"><div class="sidebar-dot"></div> Customers</div>
-          <div class="sidebar-item mock-tab" data-tab="tickets"><div class="sidebar-dot"></div> Tickets</div>
-          <div class="sidebar-item mock-tab active" data-tab="analytics"><div class="sidebar-dot"></div> Analytics</div>
-          <div class="sidebar-item mock-tab" data-tab="reports"><div class="sidebar-dot"></div> Reports</div>
+          <div class="sidebar-item mock-tab" data-tab="settings" role="button" tabindex="0"><div class="sidebar-dot"></div> Settings</div>
+          <div class="sidebar-item mock-tab" data-tab="customers" role="button" tabindex="0"><div class="sidebar-dot"></div> Customers</div>
+          <div class="sidebar-item mock-tab" data-tab="tickets" role="button" tabindex="0"><div class="sidebar-dot"></div> Tickets</div>
+          <div class="sidebar-item mock-tab active" data-tab="analytics" role="button" tabindex="0"><div class="sidebar-dot"></div> Analytics</div>
+          <div class="sidebar-item mock-tab" data-tab="reports" role="button" tabindex="0"><div class="sidebar-dot"></div> Reports</div>
         </div>
         <div class="mockup-main">
           <!-- ANALYTICS TAB -->
@@ -837,6 +844,9 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
   document.querySelectorAll('.mock-tab').forEach(tab => {
     tab.style.cursor = 'pointer';
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    tab.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(tab.dataset.tab); }
+    });
   });
 
   // ── LIVE TICKET FEED (on tickets tab) ──
