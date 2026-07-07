@@ -57,7 +57,8 @@ nav{position:fixed;top:2px;left:0;right:0;z-index:100;padding:20px 60px;display:
 @keyframes particleDrift{0%{opacity:0;transform:translateY(0) scale(0)}15%{opacity:0.8}85%{opacity:0.4}100%{opacity:0;transform:translateY(-80vh) scale(1.2)}}
 
 /* ── MOCKUP GLOW BORDER ── */
-.mockup-border{border-radius:17px;padding:1px;background:linear-gradient(135deg,rgba(124,90,240,0.6),rgba(96,165,250,0.3),rgba(52,211,152,0.4),rgba(124,90,240,0.6));background-size:300% 300%;animation:borderPulse 5s ease infinite;position:relative}
+.mockup-border{border-radius:17px;padding:1px;background:linear-gradient(135deg,rgba(124,90,240,0.6),rgba(96,165,250,0.3),rgba(52,211,152,0.4),rgba(124,90,240,0.6));background-size:300% 300%;animation:borderPulse 5s ease infinite;animation-play-state:paused;position:relative}
+.mockup-border.in-view{animation-play-state:running}
 .mockup{background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,0.8)}
 @keyframes borderPulse{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 
@@ -855,7 +856,20 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
     while (list.children.length > 6) list.removeChild(list.lastChild);
   }
 
-  setInterval(addLiveTicket, 3200);
+  let ticketIntervalId = null;
+  const mockupWrap = document.querySelector('.mockup-wrap');
+  if (mockupWrap) {
+    new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          if (!ticketIntervalId) ticketIntervalId = setInterval(addLiveTicket, 3200);
+        } else {
+          clearInterval(ticketIntervalId);
+          ticketIntervalId = null;
+        }
+      });
+    }).observe(mockupWrap);
+  }
 
   // ── ANIMATE BARS ON SCROLL ──
   const barsObserver = new IntersectionObserver((entries) => {
@@ -883,10 +897,18 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
 
   // ── MOUSE GLOW ──
   const glow = document.getElementById('mouse-glow');
-  document.addEventListener('mousemove', e => {
-    glow.style.left = e.clientX + 'px';
-    glow.style.top = e.clientY + 'px';
-  });
+  if (!window.matchMedia('(pointer: coarse)').matches) {
+    let glowPending = false;
+    document.addEventListener('mousemove', e => {
+      if (glowPending) return;
+      glowPending = true;
+      requestAnimationFrame(() => {
+        glow.style.left = e.clientX + 'px';
+        glow.style.top = e.clientY + 'px';
+        glowPending = false;
+      });
+    });
+  }
 
   // ── FLOATING PARTICLES ──
   (function() {
@@ -944,6 +966,14 @@ footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;align-i
       card.style.boxShadow = '';
     });
   });
+
+  // ── BORDER PULSE: only animate when in viewport ──
+  const mockupBorderEl = document.querySelector('.mockup-border');
+  if (mockupBorderEl) {
+    new IntersectionObserver(entries => {
+      entries.forEach(e => mockupBorderEl.classList.toggle('in-view', e.isIntersecting));
+    }).observe(mockupBorderEl);
+  }
 
   // ── INIT ──
   window.addEventListener('load', () => {
