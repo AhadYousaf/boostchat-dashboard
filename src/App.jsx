@@ -851,6 +851,14 @@ const TelegramSettingsTab = ({ node }) => {
                     >
                       {s.is_service_open === false ? "OFF" : "ON"}
                     </button>
+                    {/* PING OWNER */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setServices(services.map((sv,j)=>j===i?{...sv,alert_owner:!sv.alert_owner}:sv)); }}
+                      style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 6px", cursor:"pointer", fontSize:10, color: s.alert_owner?"#60a5fa":"#6060a0" }}
+                      title={s.alert_owner ? "Ping owner: ON" : "Ping owner: OFF"}
+                    >
+                      🔔
+                    </button>
                     {/* EXPAND */}
                     <button
                       onClick={(e) => { e.stopPropagation(); setExpandedSvc(expandedSvc===i?null:i); }}
