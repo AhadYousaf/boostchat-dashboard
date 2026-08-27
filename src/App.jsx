@@ -854,10 +854,31 @@ const TelegramSettingsTab = ({ node }) => {
                     {/* PING OWNER */}
                     <button
                       onClick={(e) => { e.stopPropagation(); setServices(services.map((sv,j)=>j===i?{...sv,alert_owner:!sv.alert_owner}:sv)); }}
-                      style={{ background:"transparent", border:"1px solid #2a2a3e", borderRadius:4, padding:"2px 6px", cursor:"pointer", fontSize:10, color: s.alert_owner?"#60a5fa":"#6060a0" }}
-                      title={s.alert_owner ? "Ping owner: ON" : "Ping owner: OFF"}
+                      style={{
+                        display:"flex", alignItems:"center", gap:4,
+                        background: s.alert_owner ? "#60a5fa22" : "#1a1a28",
+                        border: `1px solid ${s.alert_owner ? "#60a5fa" : "#3a3a4e"}`,
+                        borderRadius:10,
+                        padding:"2px 6px 2px 4px",
+                        cursor:"pointer",
+                        fontSize:9,
+                        fontWeight:700,
+                        color: s.alert_owner ? "#60a5fa" : "#6060a0"
+                      }}
+                      title={s.alert_owner ? "Ping owner: ON — click to turn off" : "Ping owner: OFF — click to turn on"}
                     >
-                      🔔
+                      <span style={{
+                        position:"relative", width:18, height:10, borderRadius:6, flexShrink:0,
+                        background: s.alert_owner ? "#60a5fa" : "#3a3a4e",
+                        transition:"background 0.15s"
+                      }}>
+                        <span style={{
+                          position:"absolute", top:1, left: s.alert_owner ? 9 : 1,
+                          width:8, height:8, borderRadius:"50%", background:"#fff",
+                          transition:"left 0.15s", boxShadow:"0 1px 2px #0006"
+                        }}/>
+                      </span>
+                      {s.alert_owner ? "🔔 ON" : "🔕 OFF"}
                     </button>
                     {/* EXPAND */}
                     <button
